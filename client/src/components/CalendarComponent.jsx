@@ -5,6 +5,8 @@ import Modal from 'react-modal';
 import { AuthContext, fetchWithToken } from '../context/AuthContext';
 import './CalendarComponent.css';
 
+Modal.setAppElement('#root'); // For accessibility
+
 const localizer = momentLocalizer(moment);
 
 const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
@@ -14,13 +16,13 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
   const [date, setDate] = useState(moment().toDate());
   const [view, setView] = useState('week');
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [eventForm, setEventForm] = useState({ 
-    title: '', 
-    start: null, 
-    end: null, 
-    allDay: false, 
-    recurrence: 'Does not repeat', 
-    recurrenceEnd: null 
+  const [eventForm, setEventForm] = useState({
+    title: '',
+    start: null,
+    end: null,
+    allDay: false,
+    recurrence: 'Does not repeat',
+    recurrenceEnd: null,
   });
 
   useEffect(() => {
@@ -29,21 +31,19 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
         const response = await fetchWithToken('http://localhost:5000/api/calendar/events');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-        const allEvents = Array.isArray(data) ? data.reduce((acc, event) => {
-          acc.push({
-            id: event.id,
-            title: event.summary || 'Untitled Event',
-            start: moment.tz(event.start.dateTime || event.start, 'UTC').toDate(),
-            end: moment.tz(event.end.dateTime || event.end, 'UTC').toDate(),
-            allDay: !event.start.dateTime && !event.end.dateTime,
-            recurrence: event.recurrence || 'Does not repeat',
-            recurrenceEnd: event.recurrenceEnd || null,
-            seriesId: event.seriesId || (event.recurrence !== 'Does not repeat' ? event.id : null),
-          });
-          return acc;
-        }, []) : [];
+        const allEvents = Array.isArray(data)
+          ? data.map((event) => ({
+              id: event.id,
+              title: event.summary || 'Untitled Event',
+              start: moment.tz(event.start.dateTime || event.start.date, 'UTC').toDate(),
+              end: moment.tz(event.end.dateTime || event.end.date, 'UTC').toDate(),
+              allDay: !event.start.dateTime && !event.end.dateTime,
+              recurrence: event.recurrence || 'Does not repeat',
+              recurrenceEnd: event.recurrenceEnd ? moment.tz(event.recurrenceEnd, 'UTC').toDate() : null,
+              seriesId: event.seriesId || (event.recurrence !== 'Does not repeat' ? event.id : null),
+            }))
+          : [];
         setEvents(allEvents);
-        setError(null);
         if (onEventUpdate) onEventUpdate(allEvents);
       } catch (err) {
         console.error('Fetch error:', err);
@@ -72,13 +72,13 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
     const startMoment = moment.tz(start, 'America/Los_Angeles');
     const isAllDay = !startMoment.hours() && !startMoment.minutes();
     const endMoment = moment.tz(start, 'America/Los_Angeles').add(isAllDay ? 1 : 1, isAllDay ? 'day' : 'hour');
-    setEventForm({ 
-      title: '', 
-      start: startMoment.toDate(), 
-      end: endMoment.toDate(), 
-      allDay: isAllDay, 
-      recurrence: 'Does not repeat', 
-      recurrenceEnd: null 
+    setEventForm({
+      title: '',
+      start: startMoment.toDate(),
+      end: endMoment.toDate(),
+      allDay: isAllDay,
+      recurrence: 'Does not repeat',
+      recurrenceEnd: null,
     });
     setSelectedEvent(null);
     openModal();
@@ -120,9 +120,8 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
       summary: title,
       start: allDay ? { date: startMoment.format('YYYY-MM-DD') } : { dateTime: startMoment.toISOString(), timeZone: 'UTC' },
       end: allDay ? { date: endMoment.format('YYYY-MM-DD') } : { dateTime: endMoment.toISOString(), timeZone: 'UTC' },
-      ...(recurrence !== 'Does not repeat' && { recurrence, recurrenceEnd }),
+      ...(recurrence !== 'Does not repeat' && { recurrence, recurrenceEnd: recurrenceEnd ? moment.tz(recurrenceEnd, 'America/Los_Angeles').utc().format('YYYY-MM-DD') : null }),
     };
-    console.log('Sending event data to server:', eventData);
 
     try {
       let response;
@@ -139,32 +138,11 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
           body: JSON.stringify(eventData),
         });
       }
-      console.log('Fetch response status:', response.status);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const newEvent = await response.json();
-      console.log('Response from server:', newEvent);
-      const fetchEvents = async () => {
-        const response = await fetchWithToken('http://localhost:5000/api/calendar/events');
-        if (response.ok) {
-          const data = await response.json();
-          const allEvents = Array.isArray(data) ? data.reduce((acc, event) => {
-            acc.push({
-              id: event.id,
-              title: event.summary || 'Untitled Event',
-              start: moment.tz(event.start.dateTime || event.start, 'UTC').toDate(),
-              end: moment.tz(event.end.dateTime || event.end, 'UTC').toDate(),
-              allDay: !event.start.dateTime && !event.end.dateTime,
-              recurrence: event.recurrence || 'Does not repeat',
-              recurrenceEnd: event.recurrenceEnd || null,
-              seriesId: event.seriesId || (event.recurrence !== 'Does not repeat' ? event.id : null),
-            });
-            return acc;
-          }, []) : [];
-          setEvents(allEvents);
-          if (onEventUpdate) onEventUpdate(allEvents);
-        }
-      };
-      await fetchEvents();
+      const updatedEvents = events.map((e) => (e.id === newEvent.id ? { ...newEvent, start: moment.tz(newEvent.start.dateTime || newEvent.start, 'UTC').toDate(), end: moment.tz(newEvent.end.dateTime || newEvent.end, 'UTC').toDate() } : e));
+      setEvents(updatedEvents);
+      if (onEventUpdate) onEventUpdate(updatedEvents);
       closeModal();
     } catch (err) {
       console.error('Error saving event:', err);
@@ -177,45 +155,22 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
     if (!window.confirm('Are you sure you want to delete this event?')) return;
 
     const isSeries = selectedEvent.recurrence !== 'Does not repeat' && selectedEvent.seriesId;
-    let confirmMessage = 'Are you sure you want to delete this event?';
-    if (isSeries) {
-      confirmMessage = 'Delete this event only, or the entire series?\nPress OK to delete this event, Cancel to delete the series.';
-    }
+    const confirmMessage = isSeries
+      ? 'Delete this event only, or the entire series?\nPress OK to delete this event, Cancel to delete the series.'
+      : 'Are you sure you want to delete this event?';
+    const shouldDeleteSeries = isSeries && !window.confirm(confirmMessage);
 
     try {
-      const shouldDeleteSeries = isSeries && !window.confirm(confirmMessage);
-      const deleteUrl = `http://localhost:5000/api/calendar/events/${selectedEvent.id}`;
-      const response = await fetchWithToken(deleteUrl, {
+      const response = await fetchWithToken(`http://localhost:5000/api/calendar/events/${selectedEvent.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deleteSeries: shouldDeleteSeries }),
       });
-      console.log('Delete response status:', response.status);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      console.log('Delete response:', await response.text());
+      const updatedEvents = events.filter((e) => (shouldDeleteSeries ? e.seriesId !== selectedEvent.seriesId : e.id !== selectedEvent.id));
+      setEvents(updatedEvents);
+      if (onEventUpdate) onEventUpdate(updatedEvents);
       closeModal();
-      const fetchEvents = async () => {
-        const response = await fetchWithToken('http://localhost:5000/api/calendar/events');
-        if (response.ok) {
-          const data = await response.json();
-          const allEvents = Array.isArray(data) ? data.reduce((acc, event) => {
-            acc.push({
-              id: event.id,
-              title: event.summary || 'Untitled Event',
-              start: moment.tz(event.start.dateTime || event.start, 'UTC').toDate(),
-              end: moment.tz(event.end.dateTime || event.end, 'UTC').toDate(),
-              allDay: !event.start.dateTime && !event.end.dateTime,
-              recurrence: event.recurrence || 'Does not repeat',
-              recurrenceEnd: event.recurrenceEnd || null,
-              seriesId: event.seriesId || (event.recurrence !== 'Does not repeat' ? event.id : null),
-            });
-            return acc;
-          }, []) : [];
-          setEvents(allEvents);
-          if (onEventUpdate) onEventUpdate(allEvents);
-        }
-      };
-      await fetchEvents();
     } catch (err) {
       console.error('Error deleting event:', err);
       alert('Failed to delete event: ' + err.message);
@@ -223,8 +178,9 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
   };
 
   const onEventDrop = ({ event, start, end }) => {
+    if (!isAdmin) return;
     const updatedEvent = { ...event, start, end };
-    const updatedEvents = events.map(e => (e.id === event.id ? updatedEvent : e));
+    const updatedEvents = events.map((e) => (e.id === event.id ? updatedEvent : e));
     setEvents(updatedEvents);
     if (onEventUpdate) onEventUpdate(updatedEvents);
 
@@ -236,37 +192,23 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
         start: { dateTime: moment.tz(start, 'America/Los_Angeles').utc().toISOString(), timeZone: 'UTC' },
         end: { dateTime: moment.tz(end, 'America/Los_Angeles').utc().toISOString(), timeZone: 'UTC' },
       }),
-    }).catch(err => console.error('Error updating event on drop:', err));
+    }).catch((err) => console.error('Error updating event on drop:', err));
   };
 
   const slotPropGetter = () => ({ style: { minHeight: '60px' } });
 
-  const eventPropGetter = (event, start, end, isSelected) => {
-    const durationMinutes = moment(end).diff(moment(start), 'minutes');
-    const isMultiDay = moment(end).isAfter(moment(start), 'day');
-    return {
-      style: {
-        backgroundColor: isAdmin ? '#4CAF50' : '#3174d6',
-        borderRadius: isMultiDay ? '4px 0 0 4px' : '4px',
-        color: 'white',
-        padding: '2px 6px',
-        margin: '2px 0',
-        height: isMultiDay ? '100%' : `${durationMinutes / 30 * 30}px`,
-        maxHeight: 'none',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        borderRight: isMultiDay ? '1px dashed #fff' : 'none',
-      },
-    };
-  };
-
-  const dayPropGetter = (date) => {
-    const dayEvents = events.filter(event =>
-      moment(event.start).isSame(date, 'day') || moment(event.end).isSame(date, 'day')
-    );
-    return { style: { backgroundColor: dayEvents.length > 0 ? '#f0f0f0' : 'transparent' } };
-  };
+  const eventPropGetter = (event) => ({
+    style: {
+      backgroundColor: isAdmin ? '#4CAF50' : '#3174d6',
+      borderRadius: '4px',
+      color: 'white',
+      padding: '2px 6px',
+      margin: '2px 0',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    },
+  });
 
   return (
     <div style={{ height: height, minHeight: '600px' }}>
@@ -294,7 +236,6 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
           timeslots={2}
           slotPropGetter={slotPropGetter}
           eventPropGetter={eventPropGetter}
-          dayPropGetter={dayPropGetter}
           components={{
             event: ({ event }) => (
               <div className="p-1 text-white truncate" title={event.title}>
@@ -321,7 +262,6 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
               backgroundColor: '#ffffff',
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
               color: '#333333',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif',
             },
             overlay: { backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 1000 },
           }}
@@ -336,46 +276,44 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
             onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
             placeholder="Event Title"
             className="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
-            style={{ color: '#333333', backgroundColor: '#f9f9f9' }}
           />
-          <label className="block mb-4" style={{ color: '#333333' }}>
+          <label className="block mb-4">
             Start:
             <input
               type="datetime-local"
               value={moment(eventForm.start).format('YYYY-MM-DDTHH:mm')}
               onChange={(e) => setEventForm({ ...eventForm, start: new Date(e.target.value) })}
               className="w-full p-3 mt-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
-              style={{ color: '#333333', backgroundColor: '#f9f9f9' }}
             />
           </label>
-          <label className="block mb-4" style={{ color: '#333333' }}>
+          <label className="block mb-4">
             End:
             <input
               type="datetime-local"
               value={moment(eventForm.end).format('YYYY-MM-DDTHH:mm')}
               onChange={(e) => setEventForm({ ...eventForm, end: new Date(e.target.value) })}
               className="w-full p-3 mt-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
-              style={{ color: '#333333', backgroundColor: '#f9f9f9' }}
               disabled={eventForm.allDay}
             />
           </label>
-          <label className="block mb-4" style={{ color: '#333333' }}>
+          <label className="block mb-4">
             All Day:
             <input
               type="checkbox"
               checked={eventForm.allDay}
-              onChange={(e) => {
-                const isAllDay = e.target.checked;
+              onChange={(e) =>
                 setEventForm({
                   ...eventForm,
-                  allDay: isAllDay,
-                  end: isAllDay ? moment.tz(eventForm.start, 'America/Los_Angeles').add(1, 'day').toDate() : eventForm.end,
-                });
-              }}
+                  allDay: e.target.checked,
+                  end: e.target.checked
+                    ? moment.tz(eventForm.start, 'America/Los_Angeles').add(1, 'day').toDate()
+                    : eventForm.end,
+                })
+              }
               className="ml-2 mt-1"
             />
           </label>
-          <label className="block mb-4" style={{ color: '#333333' }}>
+          <label className="block mb-4">
             Recurrence:
             <select
               value={eventForm.recurrence}
@@ -390,13 +328,16 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
             </select>
           </label>
           {eventForm.recurrence !== 'Does not repeat' && (
-            <label className="block mb-4" style={{ color: '#333333' }}>
+            <label className="block mb-4">
               Ends:
               <select
                 value={eventForm.recurrenceEnd ? 'On' : 'Never'}
-                onChange={(e) => {
-                  setEventForm({ ...eventForm, recurrenceEnd: e.target.value === 'On' ? eventForm.recurrenceEnd || moment().add(1, 'month').toDate() : null });
-                }}
+                onChange={(e) =>
+                  setEventForm({
+                    ...eventForm,
+                    recurrenceEnd: e.target.value === 'On' ? eventForm.recurrenceEnd || moment().add(1, 'month').toDate() : null,
+                  })
+                }
                 className="w-full p-3 mt-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
               >
                 <option value="Never">Never</option>
@@ -408,7 +349,6 @@ const CalendarComponent = ({ onEventUpdate, height = '800px' }) => {
                   value={moment(eventForm.recurrenceEnd).format('YYYY-MM-DD')}
                   onChange={(e) => setEventForm({ ...eventForm, recurrenceEnd: new Date(e.target.value) })}
                   className="w-full p-3 mt-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
-                  style={{ color: '#333333', backgroundColor: '#f9f9f9' }}
                 />
               )}
             </label>

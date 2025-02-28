@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext'; // Updated import
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Home from './pages/Home';
 import HorseBoarding from './pages/HorseBoarding';
@@ -9,7 +9,6 @@ import Calendar from './pages/Calendar';
 import HorseLessons from './pages/HorseLessons';
 import TrailRides from './pages/TrailRides';
 import Admin from './pages/Admin';
-import AdminCalendar from './pages/AdminCalendar';
 import AdminHorseBoarding from './pages/AdminHorseBoarding';
 import AdminHorseLessons from './pages/AdminHorseLessons';
 import AdminTrailRides from './pages/AdminTrailRides';
@@ -23,20 +22,14 @@ function App() {
     script.async = true;
     script.defer = true;
     script.onload = () => {
+      console.log('Google Sign-In SDK loaded');
       if (window.google) {
         const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
         if (!clientId) {
           console.error('VITE_GOOGLE_CLIENT_ID is not set in .env file');
           return;
         }
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: handleCredentialResponse,
-        });
-        window.google.accounts.id.renderButton(
-          document.getElementById('google-signin'),
-          { theme: 'outline', size: 'large' }
-        );
+        // Initialization handled in Header.jsx, so no renderButton here
       }
     };
     script.onerror = () => console.error('Failed to load Google Sign-In SDK');
@@ -48,9 +41,9 @@ function App() {
   }, []);
 
   const handleCredentialResponse = (response) => {
-    console.log('Encoded JWT ID token: ' + response.credential);
+    console.log('Encoded JWT ID token:', response.credential);
     localStorage.setItem('googleIdToken', response.credential);
-    window.location.href = '/admin';
+    window.location.href = '/';
   };
 
   return (
@@ -71,14 +64,6 @@ function App() {
                 element={
                   <RequireAdmin>
                     <Admin />
-                  </RequireAdmin>
-                }
-              />
-              <Route
-                path="/admin/calendar"
-                element={
-                  <RequireAdmin>
-                    <AdminCalendar />
                   </RequireAdmin>
                 }
               />

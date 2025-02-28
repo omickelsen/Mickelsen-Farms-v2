@@ -1,0 +1,39 @@
+.calendar-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0.5rem;
+  }
+  
+  .calendar-iframe-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    height: 0;
+    padding-bottom: 75%; /* 4:3 aspect ratio for desktop */
+  }
+  
+  .calendar-iframe-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  
+  @media (max-width: 640px) {
+    .calendar-section {
+      padding: 0.25rem;
+    }
+    .calendar-iframe-container {
+      border: none;
+      box-shadow: none;
+      padding-bottom: 100%; /* Square aspect ratio on mobile */
+    }
+  }
+  
+  .btn-primary {
+    @apply bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors duration-300;
+  }

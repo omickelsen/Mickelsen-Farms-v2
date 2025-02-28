@@ -1,139 +1,137 @@
-/* client/src/components/CalendarComponent.css */
-
 .calendar-container {
-    height: 100%;
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-    background-color: #ffffff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    overflow: auto;
-  }
-  
-  .rbc-calendar {
-    height: 100% !important;
-    width: 100%;
-    font-family: Arial, sans-serif;
-  }
-  
-  .rbc-month-view,
-  .rbc-week-view,
-  .rbc-day-view {
-    height: 100% !important;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .rbc-header {
-    background-color: #f8f9fa;
-    padding: 10px;
-    text-align: center;
-    border-bottom: 1px solid #ddd;
-    font-weight: bold;
-    font-size: 14px;
-    color: #333; /* Darker text for day names */
-  }
-  
-  .rbc-toolbar {
-    padding: 15px;
-    border-bottom: 1px solid #ddd;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #e9ecef;
-  }
-  
-  .rbc-toolbar span { /* Target the label text specifically */
-    color: #333; /* Darker text for the month label */
-    font-weight: bold;
-    font-size: 16px;
-    padding: 0 10px;
-  }
-  
-  .rbc-toolbar button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin: 0 5px;
-    transition: background-color 0.3s;
-  }
-  
-  .rbc-toolbar button:hover {
-    background-color: #0056b3;
-  }
-  
-  .rbc-toolbar button:disabled {
-    background-color: #6c757d;
-    cursor: not-allowed;
-  }
-  
-  .rbc-day-bg {
-    background-color: #ffffff;
-    border: 1px solid #eee;
-    min-height: 150px;
-    padding: 5px;
-    transition: background-color 0.3s;
-    color: #333; /* Darker text for day numbers */
-  }
-  
-  .rbc-day-bg:hover {
-    background-color: #f1f1f1;
-  }
-  
-  .rbc-off-range-bg {
-    background-color: #f0f0f0;
-    opacity: 1;
-    color: #666; /* Medium gray for off-range days */
-  }
-  
-  .rbc-event {
-    background-color: #3174d6;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    margin: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  
-  .rbc-selected {
-    background-color: #28a745;
-    border: 1px solid #218838;
-    color: white;
-  }
-  
-  .rbc-agenda {
-    border: 1px solid #ddd;
-  }
-  
-  .rbc-agenda-table {
-    width: 100%;
-  }
-  
-  .rbc-agenda-content {
-    padding: 10px;
-  }
-  
-  .rbc-row {
-    font-size: 14px;
-    color: #333;
-  }
-  
-  .rbc-date-cell {
-    color: #333 !important;
-  }
-  
-  .rbc-toolbar select {
-    background-color: white;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 5px;
-    color: #333; /* Darker text for dropdown */
-  }
+  height: 100%;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: auto;
+}
+
+.rbc-calendar {
+  height: 100% !important;
+  width: 100%;
+  font-family: Arial, sans-serif;
+}
+
+.rbc-month-view,
+.rbc-week-view,
+.rbc-day-view {
+  height: 100% !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.rbc-header {
+  background-color: #f8f9fa;
+  padding: 10px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+  font-weight: bold;
+  font-size: 14px;
+  color: #333;
+}
+
+.rbc-toolbar {
+  padding: 15px;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #e9ecef;
+}
+
+.rbc-toolbar span {
+  color: #333;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 0 10px;
+}
+
+.rbc-toolbar button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 0 5px;
+  transition: background-color 0.3s;
+}
+
+.rbc-toolbar button:hover {
+  background-color: #0056b3;
+}
+
+.rbc-toolbar button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.rbc-day-bg {
+  background-color: #fff;
+  border: 1px solid #eee;
+  min-height: 120px;
+  padding: 5px;
+  transition: background-color 0.3s;
+  color: #333;
+}
+
+.rbc-day-bg:hover {
+  background-color: #f1f1f1;
+}
+
+.rbc-off-range-bg {
+  background-color: #f0f0f0;
+  opacity: 1;
+  color: #666;
+}
+
+.rbc-event {
+  background-color: #3174d6;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rbc-selected {
+  background-color: #28a745;
+  border: 1px solid #218838;
+  color: white;
+}
+
+.rbc-agenda {
+  border: 1px solid #ddd;
+}
+
+.rbc-agenda-table {
+  width: 100%;
+}
+
+.rbc-agenda-content {
+  padding: 10px;
+}
+
+.rbc-row {
+  font-size: 14px;
+  color: #333;
+}
+
+.rbc-date-cell {
+  color: #333 !important;
+}
+
+.rbc-toolbar select {
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 5px;
+  color: #333;
+}

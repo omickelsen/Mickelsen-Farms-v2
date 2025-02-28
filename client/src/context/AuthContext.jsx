@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const idToken = window.localStorage.getItem('googleIdToken');
+    console.log('Stored token:', idToken); // Debug log
     if (idToken && !token) {
       setToken(idToken);
       verifyAdmin(idToken);
@@ -22,9 +23,11 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=${idToken}`);
       const data = await response.json();
-      const ADMIN_EMAILS = ['omickelsen@gmail.com', 'mickelsenfamilyfarms@gmail.com'];
+      console.log('Token data:', data); // Debug log
+      const ADMIN_EMAILS = ['omickelsen@gmail.com', 'mickelsenfamilyfarms@gmail.com']; // Ensure this matches
       setIsAdmin(ADMIN_EMAILS.includes(data.email));
       setUser({ email: data.email });
+      console.log('Is Admin:', ADMIN_EMAILS.includes(data.email), 'Email:', data.email); // Debug log
     } catch (err) {
       console.error('Error verifying admin:', err);
       setError(err.message);
