@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { resolve } from 'path'; // Import resolve for alias (optional)
 
-// https://vite.dev/config/
 export default defineConfig({
   server: {
     port: 3000, // Set the development server to run on port 3000
@@ -10,4 +10,12 @@ export default defineConfig({
   },
   plugins: [react()],
   clearScreen: false, // Keep terminal output visible
+  css: {
+    postcss: './postcss.config.js', // Specify the PostCSS configuration file
+  },
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'), // Optional alias for src directory
+    },
+  },
 });

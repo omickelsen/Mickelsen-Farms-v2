@@ -32,3 +32,6 @@ Thumbs.db
 # Miscellaneous
 *.swp
 *.swo
+
+# New entry
+service-account-key.json

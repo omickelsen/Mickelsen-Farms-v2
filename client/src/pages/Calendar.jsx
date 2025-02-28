@@ -1,30 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import CalendarComponent from '../components/CalendarComponent';
 
 function Calendar() {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/calendar/events');
-        if (!response.ok) throw new Error('Failed to fetch events');
-        const data = await response.json();
-        setEvents(data);
-      } catch (err) {
-        console.error('Error fetching events:', err);
-      }
+    const syncEvents = (newEvents) => {
+      setEvents(newEvents);
     };
-    fetchEvents();
   }, []);
 
   return (
-    <div>
-      <h2>Calendar</h2>
-      <ul>
-        {events.map(event => (
-          <li key={event.id}>{event.summary} - {new Date(event.start.dateTime).toLocaleString()}</li>
-        ))}
-      </ul>
+    <div className="py-16 bg-white">
+      <h2 className="section-title">Calendar</h2>
+      <div className="max-w-5xl mx-auto">
+        <CalendarComponent onEventUpdate={setEvents} height="1000px" />
+      </div>
     </div>
   );
 }

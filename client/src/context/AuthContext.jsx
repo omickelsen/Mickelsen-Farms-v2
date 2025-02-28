@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const idToken = window.localStorage.getItem('googleIdToken');
+    console.log('Retrieved idToken from localStorage:', idToken); // Add logging
     if (idToken && !token) {
       console.log('Setting token from localStorage:', idToken);
       setToken(idToken);
@@ -39,7 +40,6 @@ export const AuthProvider = ({ children }) => {
     setIsAdmin(false);
   };
 
-
   return (
     <AuthContext.Provider value={{ token, setToken, user, logout, loading, error, isAdmin }}>
       {loading ? <p>Loading...</p> : error ? <p>Error: {error}</p> : children}
@@ -49,6 +49,7 @@ export const AuthProvider = ({ children }) => {
 
 export const fetchWithToken = async (url, options = {}) => {
   const idToken = window.localStorage.getItem('googleIdToken');
+  console.log('Fetching with token:', idToken); // Add logging
   const headers = {
     ...options.headers,
     'Authorization': `Bearer ${idToken}`,
