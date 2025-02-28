@@ -1,37 +1,39 @@
 import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { token, logout } = useAuth();
 
-  // Map navigation items to their routes and section IDs
   const navItems = [
     { label: 'About Us', route: '/', sectionId: '#about' },
     { label: 'Services', route: '/horse-boarding', sectionId: '#services' },
     { label: 'Calendar', route: '/calendar', sectionId: '#calendar' },
-    { label: 'Owners', route: '/owners', sectionId: '#owners' }, // Adjust route if needed
     { label: 'Contact Us', route: '/contact', sectionId: '#contact' },
   ];
 
   const handleNavClick = (route, sectionId) => {
     if (location.pathname === '/') {
-      // On homepage, scroll to section
       const element = document.getElementById(sectionId.replace('#', ''));
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }
     } else {
-      // On other pages, navigate to the route and scroll to section
       navigate(route + sectionId);
     }
   };
 
-  // Handle brand click to navigate to homepage
   const handleBrandClick = () => {
     if (location.pathname !== '/') {
       navigate('/');
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
 
   // Ensure smooth scrolling on page load if URL has hash
@@ -64,7 +66,17 @@ const Header = () => {
           </a>
         ))}
       </nav>
-      <div id="google-signin"></div> {/* Google Sign-In button placeholder */}
+      <div className="flex items-center">
+        <div id="google-signin" className={token ? 'hidden' : ''}></div>
+        {token && (
+          <button
+            onClick={handleLogout}
+            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 ml-2"
+          >
+            Logout
+          </button>
+        )}
+      </div>
     </header>
   );
 };

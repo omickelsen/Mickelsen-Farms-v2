@@ -11,9 +11,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const idToken = window.localStorage.getItem('googleIdToken');
-    console.log('Retrieved idToken from localStorage:', idToken); // Add logging
     if (idToken && !token) {
-      console.log('Setting token from localStorage:', idToken);
       setToken(idToken);
       verifyAdmin(idToken);
       setLoading(false);
@@ -49,7 +47,6 @@ export const AuthProvider = ({ children }) => {
 
 export const fetchWithToken = async (url, options = {}) => {
   const idToken = window.localStorage.getItem('googleIdToken');
-  console.log('Fetching with token:', idToken); // Add logging
   const headers = {
     ...options.headers,
     'Authorization': `Bearer ${idToken}`,

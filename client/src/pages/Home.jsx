@@ -1,16 +1,27 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchWithToken } from '../context/AuthContext';
 import CalendarComponent from '../components/CalendarComponent';
+import ServicesSection from '../components/ServicesSection';
+import CarouselComponent from '../components/CarouselComponent';
+import { useAuth } from '../context/AuthContext';
 
 function Home() {
   const [events, setEvents] = useState([]);
   const [request, setRequest] = useState('');
   const [message, setMessage] = useState('');
+  const [images, setImages] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [loadingImages, setLoadingImages] = useState(true); // New loading state
+  const { token, isAdmin } = useAuth();
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const response = await fetchWithToken('http://localhost:5000/api/calendar/events');
+        const response = await fetchWithToken(
+          process.env.NODE_ENV === 'production'
+            ? 'https://your-heroku-app.herokuapp.com/api/calendar/events'
+            : 'http://localhost:5000/api/calendar/events'
+        );
         if (!response.ok) throw new Error('Failed to fetch events');
         const data = await response.json();
         setEvents(data);
@@ -18,17 +29,44 @@ function Home() {
         console.error('Error fetching events:', err);
       }
     };
+
+    const fetchImages = async () => {
+      setLoadingImages(true); // Start loading
+      try {
+        const response = await fetch(
+          process.env.NODE_ENV === 'production'
+            ? 'https://your-heroku-app.herokuapp.com/api/images'
+            : 'http://localhost:5000/api/images'
+        ); // Unauthenticated fetch for images
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        console.log('Pre-loaded images:', data.images); // Debug log
+        setImages(data.images || []);
+      } catch (err) {
+        console.error('Error pre-loading images:', err);
+        setImages([]); // Fallback to empty array on error
+      } finally {
+        setLoadingImages(false); // End loading
+      }
+    };
+
     fetchEvents();
-  }, []); // Empty dependency array for one-time fetch
+    fetchImages();
+  }, []);
 
   const handleRequestSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request }),
-      });
+      const response = await fetch(
+        process.env.NODE_ENV === 'production'
+          ? 'https://your-heroku-app.herokuapp.com/api/requests'
+          : 'http://localhost:5000/api/requests',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ request }),
+        }
+      );
       if (response.ok) {
         setMessage('Request submitted successfully!');
         setRequest('');
@@ -42,12 +80,10 @@ function Home() {
 
   const handleEventUpdate = useCallback((updatedEvents) => {
     setEvents(updatedEvents);
-    console.log('Events updated in Home:', updatedEvents); // Keep for debugging if needed
-  }, []); // Empty dependency array since it only depends on setEvents
+  }, []);
 
   return (
     <div className="min-h-screen pt-24">
-      {/* Hero Section */}
       <section className="relative bg-cover bg-center h-96" style={{ backgroundImage: "url('/path-to-farm-image.jpg')" }}>
         <div className="absolute inset-0 bg-black opacity-50"></div>
         <div className="relative text-center text-white pt-24">
@@ -56,71 +92,35 @@ function Home() {
         </div>
       </section>
 
-      {/* About Us Section */}
       <section id="about" className="py-16 bg-white">
         <h2 className="section-title">About Us</h2>
         <div className="max-w-3xl mx-auto text-center text-gray-700">
           <p>A family-owned farm offering horse boarding, lessons, trail rides, and events. [Add your detailed description here.]</p>
-          <img src="/path-to-about-image.jpg" alt="Farm Overview" className="mt-6 rounded-lg" />
+          {loadingImages ? (
+            <p className="text-center">Loading images...</p>
+          ) : (
+            <CarouselComponent
+              images={images}
+              setImages={setImages}
+              currentImageIndex={currentImageIndex}
+              setCurrentImageIndex={setCurrentImageIndex}
+            />
+          )}
         </div>
       </section>
 
-      {/* Services Section */}
-      <section id="services" className="py-16 bg-gray-100">
-        <h2 className="section-title">Services</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto">
-          <div className="card">
-            <h3 className="text-xl font-semibold mb-2">Horse Boarding</h3>
-            <p>Top-notch boarding with spacious stalls and daily care.</p>
-            <button onClick={() => window.location.href = '/horse-boarding'} className="btn-primary mt-4">
-              Learn More
-            </button>
-          </div>
-          <div className="card">
-            <h3 className="text-xl font-semibold mb-2">Riding Lessons</h3>
-            <p>Lessons for all levels with experienced instructors.</p>
-            <button onClick={() => window.location.href = '/horse-lessons'} className="btn-primary mt-4">
-              Learn More
-            </button>
-          </div>
-          <div className="card">
-            <h3 className="text-xl font-semibold mb-2">Trail Rides</h3>
-            <p>Guided rides through scenic farm landscapes.</p>
-            <button onClick={() => window.location.href = '/trail-rides'} className="btn-primary mt-4">
-              Learn More
-            </button>
-          </div>
-          <div className="card">
-            <h3 className="text-xl font-semibold mb-2">Events</h3>
-            <p>Clinics, open houses, and seasonal celebrations.</p>
-            <button onClick={() => window.location.href = '/events'} className="btn-primary mt-4">
-              Learn More
-            </button>
-          </div>
-        </div>
-      </section>
+      <ServicesSection />
 
-      {/* Calendar Section */}
       <section id="calendar" className="py-16 bg-white">
         <h2 className="section-title">Calendar</h2>
         <div className="calendar-section">
           <CalendarComponent
             onEventUpdate={handleEventUpdate}
-            height="600px"
+            height="900px"
           />
         </div>
       </section>
 
-      {/* Owners Section */}
-      <section id="owners" className="py-16 bg-gray-100">
-        <h2 className="section-title">Owners</h2>
-        <div className="max-w-md mx-auto text-center">
-          <img src="/path-to-owners-image.jpg" alt="Alfred and JoDee Mickelsen" className="rounded-lg mb-4" />
-          <p className="text-gray-700">Alfred and JoDee Mickelsen, passionate farm owners.</p>
-        </div>
-      </section>
-
-      {/* Contact Us Section */}
       <section id="contact" className="py-16 bg-white">
         <h2 className="section-title">Contact Us</h2>
         <div className="max-w-md mx-auto text-center text-gray-700">
@@ -130,7 +130,6 @@ function Home() {
         </div>
       </section>
 
-      {/* Request Form */}
       <section className="py-16 bg-gray-100">
         <h3 className="text-2xl font-bold text-center mb-4">Submit a Request</h3>
         <form onSubmit={handleRequestSubmit} className="max-w-md mx-auto">

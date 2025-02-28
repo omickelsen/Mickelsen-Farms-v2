@@ -5,7 +5,10 @@ const dotenv = require('dotenv');
 const authRouter = require('./routes/auth');
 const calendarRouter = require('./routes/calendar');
 const contentRouter = require('./routes/content');
-const { calendarClient } = require('./config/googleCalendar'); // Import from new file
+const { calendarClient } = require('./config/googleCalendar');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 dotenv.config();
 
@@ -49,12 +52,64 @@ const authenticateToken = async (req, res, next) => {
   next();
 };
 
+// Image Upload Configuration
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir);
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  },
+});
+const upload = multer({ storage: storage });
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Apply authentication selectively
 app.use('/api/calendar', authenticateToken);
 app.use('/api/content', authenticateToken);
+app.use('/api/images', (req, res, next) => {
+  if (req.method === 'POST') return authenticateToken(req, res, next);
+  next();
+});
 
+// Register routers
 app.use('/auth', authRouter);
 app.use('/api/calendar', calendarRouter);
 app.use('/api/content', contentRouter);
 
+// Image endpoints
+app.post('/api/images', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No image provided' });
+  }
+  if (!req.isAdmin) {
+    return res.status(403).send('Admin access required');
+  }
+  const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.json({ url });
+});
+
+app.get('/api/images', (req, res) => {
+  const uploadDir = path.join(__dirname, 'uploads');
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      console.error('Error reading uploads directory:', err);
+      return res.status(500).json({ error: 'Failed to read images' });
+    }
+    const imageUrls = files.map(file => `${req.protocol}://${req.get('host')}/uploads/${file}`);
+    console.log('Returning image URLs:', imageUrls);
+    res.json({ images: imageUrls });
+  });
+});
+
+// Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+module.exports = app;
