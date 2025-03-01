@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { fetchWithToken } from '../context/AuthContext';
 import Calendar from './Calendar';
 import ServicesSection from '../components/ServicesSection';
 import CarouselComponent from '../components/CarouselComponent';
+import HeroSection from '../components/HeroSection'; // Import the new component
 import { useAuth } from '../context/AuthContext';
 
 function Home() {
@@ -62,16 +63,7 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <section className="relative bg-cover bg-center h-64 md:h-96" style={{ backgroundImage: "url('/path-to-farm-image.jpg')" }}>
-        <div className="absolute inset-0 bg-black opacity-40"></div>
-        <div className="relative flex items-center justify-center h-full text-white p-4">
-          <div className="text-center">
-            <h1 className="text-3xl md:text-5xl font-bold text-shadow">Mickelsen Family Farms</h1>
-            <p className="mt-2 md:mt-4 text-lg md:text-xl">Experience the beauty of rural life with us.</p>
-          </div>
-        </div>
-      </section>
-
+      <HeroSection /> {/* Use the new component */}
       <section id="about" className="py-10 md:py-16">
         <div className="container">
           <h2 className="section-title">About Us</h2>
@@ -129,6 +121,6 @@ function Home() {
       </section>
     </div>
   );
-}
+};
 
 export default Home;

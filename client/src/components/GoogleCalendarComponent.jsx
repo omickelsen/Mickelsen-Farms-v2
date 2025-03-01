@@ -6,7 +6,6 @@ const GoogleCalendarComponent = ({ height = '800px' }) => { // Increased default
   const { isAdmin, token } = useAuth();
 
   useEffect(() => {
-    console.log('GoogleCalendarComponent - Rendered with:', { isAdmin, token }); // Debug log
   }, [isAdmin, token]);
 
   const calendarId = import.meta.env.VITE_GOOGLE_CALENDAR_ID || 'mickelsenfamilyfarms@gmail.com';
@@ -43,13 +42,6 @@ const GoogleCalendarComponent = ({ height = '800px' }) => { // Increased default
           allowFullScreen
         ></iframe>
       </div>
-      {isAdmin && (
-        <div className="mt-4 text-center">
-          <a href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calendarId)}`} target="_blank" rel="noopener noreferrer" className="btn-primary" onClick={(e) => console.log('Clicked Manage Calendar, URL:', `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calendarId)}`)}>
-            Manage Calendar
-          </a>
-        </div>
-      )}
     </div>
   );
 };

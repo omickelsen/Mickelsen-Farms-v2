@@ -8,6 +8,7 @@ const Header = () => {
   const { token, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const signInRef = useRef(null);
+  const isInitialized = useRef(false);
 
   const navItems = [
     { label: 'About Us', route: '/', sectionId: '#about' },
@@ -41,47 +42,48 @@ const Header = () => {
     setIsMobileMenuOpen(false);
   };
 
-  // Initialize Google Sign-In
   useEffect(() => {
-    if (!window.google || !signInRef.current) {
-      console.log('Google SDK or signInRef not available:', { windowGoogle: !!window.google, signInRef: signInRef.current });
+    if (isInitialized.current || !window.google || !signInRef.current || !import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+      console.log('Skipping initialization or already initialized'); // Generic log
       return;
     }
 
-    const handleCredentialResponse = (response) => {
-      console.log('Encoded JWT ID token:', response.credential);
-      localStorage.setItem('googleIdToken', response.credential);
-      window.location.href = '/';
-    };
+    try {
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+        auto_select: false,
+        context: 'signin',
+      });
 
-    window.google.accounts.id.initialize({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
-      callback: handleCredentialResponse,
-    });
+      if (signInRef.current.firstChild) {
+        signInRef.current.removeChild(signInRef.current.firstChild);
+      }
+      window.google.accounts.id.renderButton(signInRef.current, {
+        theme: 'outline',
+        size: 'medium',
+        width: '200px',
+        type: 'standard',
+      });
 
-    window.google.accounts.id.renderButton(signInRef.current, {
-      theme: 'outline',
-      size: 'medium',
-      width: '200px',
-    });
+      if (!token) {
+        window.google.accounts.id.prompt();
+      }
 
-    return () => {
-      // Optional cleanup
-    };
+      isInitialized.current = true;
+    } catch (error) {
+      console.error('Error initializing Google Sign-In:', error.message); // Generic error
+    }
   }, [token]);
 
-  // Ensure smooth scrolling on page load if URL has hash
-  useEffect(() => {
-    if (location.hash) {
-      const element = document.getElementById(location.hash.replace('#', ''));
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  }, [location]);
+  const handleCredentialResponse = (response) => {
+    console.log('Login successful'); // Safe log
+    localStorage.setItem('googleIdToken', response.credential);
+    window.location.href = '/';
+  };
 
   return (
-    <header className="bg-teal-600 text-white p-4 flex justify-between items-center fixed w-full top-0 z-50 shadow-md  mx-auto">
+    <header className="bg-teal-600 text-white p-4 flex justify-between items-center fixed w-full top-0 z-50 shadow-md mx-auto">
       <div className="text-xl font-bold cursor-pointer flex items-center" onClick={handleBrandClick}>
         Mickelsen Family Farms
       </div>

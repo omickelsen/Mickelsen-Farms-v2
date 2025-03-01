@@ -16,13 +16,11 @@ import AdminEvents from './pages/AdminEvents';
 
 function App() {
   useEffect(() => {
-    console.log('App component mounted');
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      console.log('Google Sign-In SDK loaded');
       if (window.google) {
         const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
         if (!clientId) {
@@ -41,7 +39,6 @@ function App() {
   }, []);
 
   const handleCredentialResponse = (response) => {
-    console.log('Encoded JWT ID token:', response.credential);
     localStorage.setItem('googleIdToken', response.credential);
     window.location.href = '/';
   };
@@ -112,7 +109,6 @@ function RequireAdmin({ children }) {
   const { token, isAdmin, loading, error } = useAuth();
 
   useEffect(() => {
-    console.log('RequireAdmin token and isAdmin:', { token, isAdmin, loading, error });
   }, [token, isAdmin, loading, error]);
 
   if (loading) return <p>Loading...</p>;
