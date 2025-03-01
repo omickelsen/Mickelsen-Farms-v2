@@ -2,14 +2,21 @@ import React, { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import './GoogleCalendarComponent.css'; // Import the CSS file
 
-const GoogleCalendarComponent = ({ height = '800px' }) => { // Increased default height to 800px
+const GoogleCalendarComponent = ({ height = '800px' }) => {
   const { isAdmin, token } = useAuth();
 
   useEffect(() => {
+    // No console.log or sensitive data exposure
   }, [isAdmin, token]);
 
-  const calendarId = import.meta.env.VITE_GOOGLE_CALENDAR_ID || 'mickelsenfamilyfarms@gmail.com';
-  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY || 'AIzaSyBUIZldcTjBKL4nVnsXNg0f_YbIdoCoS4g';
+  // Access environment variables with no fallback values in source code
+  const calendarId = import.meta.env.VITE_GOOGLE_CALENDAR_ID;
+  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+
+  // Check if environment variables are available
+  if (!calendarId || !apiKey) {
+    return <div>Error: Calendar ID or API Key not configured. Please check .env file.</div>;
+  }
 
   const iframeSrc = `https://www.google.com/calendar/embed?src=${encodeURIComponent(
     calendarId
@@ -25,7 +32,7 @@ const GoogleCalendarComponent = ({ height = '800px' }) => { // Increased default
         style={{
           position: 'relative',
           width: '100%',
-          maxWidth: '1200px', // Increased max width for larger screens
+          maxWidth: '1200px',
           margin: '0 auto',
           overflow: 'hidden',
           border: '1px solid #ddd',
