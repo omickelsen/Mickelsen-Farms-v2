@@ -6,25 +6,31 @@ const HeroSection = () => {
   const [backgroundImage, setBackgroundImage] = useState('/path-to-farm-image.jpg');
   const [isUploading, setIsUploading] = useState(false);
   const [images, setImages] = useState([]); // Store all images for delete option
+  const [error, setError] = useState(null); // State for error messages
+  const [success, setSuccess] = useState(null); // State for success messages
 
   useEffect(() => {
     const fetchHeroBackground = async () => {
       try {
-        const response = await fetch(
-          process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/images?page=default'
-            : 'http://localhost:5000/api/images?page=default'
-        );
+        const response = await fetch('/api/images?page=default'); // Relative path for proxy
         if (response.ok) {
           const data = await response.json();
-          console.log('Hero fetched images data:', data);
+          if (process.env.NODE_ENV === 'development') {
+            
+          }
           setImages(data.images || []);
           setBackgroundImage(data.images[0] || '/path-to-farm-image.jpg');
         } else {
-          console.error('Fetch failed with status:', response.status);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Fetch failed with status:', response.status);
+          }
+          setError('Failed to fetch hero background.');
         }
       } catch (err) {
-        console.error('Error fetching hero background:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error fetching hero background:', err);
+        }
+        setError('Error fetching hero background.');
       }
     };
     fetchHeroBackground();
@@ -32,7 +38,7 @@ const HeroSection = () => {
 
   const handleImageUpload = async (event) => {
     if (!isAdmin || !token) {
-      alert('Only admins can change the background image.');
+      setError('Only admins can change the background image.');
       return;
     }
 
@@ -45,9 +51,7 @@ const HeroSection = () => {
 
     try {
       const uploadResponse = await fetchWithToken(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images'
-          : 'http://localhost:5000/api/images',
+        '/api/images', // Relative path for proxy
         {
           method: 'POST',
           body: formData,
@@ -60,27 +64,31 @@ const HeroSection = () => {
         throw new Error(`Failed to upload image: ${errorText}`);
       }
       const uploadData = await uploadResponse.json();
-      console.log('Upload response:', uploadData);
-
-      // Re-fetch the updated background image
-      const updatedResponse = await fetch(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images?page=default'
-          : 'http://localhost:5000/api/images?page=default'
-      );
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        console.log('Updated images data:', updatedData);
-        setImages(updatedData.images || []);
-        setBackgroundImage(updatedData.images[0] || uploadData.url || '/path-to-farm-image.jpg');
-      } else {
-        console.error('Update fetch failed with status:', updatedResponse.status);
+      if (process.env.NODE_ENV === 'development') {
+        
       }
 
-      alert('Background image updated successfully!');
+      // Re-fetch the updated background image
+      const updatedResponse = await fetch('/api/images?page=default');
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        if (process.env.NODE_ENV === 'development') {
+          
+        }
+        setImages(updatedData.images || []);
+        setBackgroundImage(updatedData.images[0] || uploadData.url || '/path-to-farm-image.jpg');
+        setSuccess('Background image updated successfully!');
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Update fetch failed with status:', updatedResponse.status);
+        }
+        setError('Failed to update background image.');
+      }
     } catch (err) {
-      console.error('Error updating hero background:', err);
-      alert('Failed to update background image: ' + err.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error updating hero background:', err);
+      }
+      setError(`Failed to update background image: ${err.message}`);
     } finally {
       setIsUploading(false);
     }
@@ -88,15 +96,13 @@ const HeroSection = () => {
 
   const handleImageDelete = async (urlToRemove) => {
     if (!isAdmin || !token) {
-      alert('Only admins can delete images.');
+      setError('Only admins can delete images.');
       return;
     }
 
     try {
       const deleteResponse = await fetchWithToken(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images'
-          : 'http://localhost:5000/api/images',
+        '/api/images', // Relative path for proxy
         {
           method: 'DELETE',
           headers: { 'Page': 'default', 'Url': urlToRemove },
@@ -109,21 +115,21 @@ const HeroSection = () => {
       }
 
       // Re-fetch after deletion
-      const updatedResponse = await fetch(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images?page=default'
-          : 'http://localhost:5000/api/images?page=default'
-      );
+      const updatedResponse = await fetch('/api/images?page=default');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        console.log('Updated images data after delete:', updatedData);
+        if (process.env.NODE_ENV === 'development') {
+          
+        }
         setImages(updatedData.images || []);
         setBackgroundImage(updatedData.images[0] || '/path-to-farm-image.jpg');
+        setSuccess('Image deleted successfully!');
       }
-      alert('Image deleted successfully!');
     } catch (err) {
-      console.error('Error deleting image:', err);
-      alert('Failed to delete image: ' + err.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error deleting image:', err);
+      }
+      setError(`Failed to delete image: ${err.message}`);
     }
   };
 
@@ -149,6 +155,8 @@ const HeroSection = () => {
             className="btn-primary p-2 rounded"
           />
           {isUploading && <span className="ml-2 text-white">Uploading...</span>}
+          {error && <div className="text-red-500 mt-2">{error}</div>}
+          {success && <div className="text-green-500 mt-2">{success}</div>}
           {images.length > 0 && (
             <div className="mt-2">
               {images.map((url, index) => (

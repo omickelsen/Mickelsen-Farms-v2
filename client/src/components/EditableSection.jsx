@@ -6,91 +6,71 @@ const EditableSection = ({ page, initialContent, field }) => {
   const [content, setContent] = useState(initialContent);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null); // State for error messages
+  const [success, setSuccess] = useState(null); // State for success messages
 
-  // Load content on mount with logging
+  // Load content on mount
   useEffect(() => {
-    console.log(`[Client] Attempting to fetch content for page: ${page}, field: ${field}`);
     const cachedContent = localStorage.getItem(`content_${page}_${field}`);
     if (cachedContent) {
       const parsedContent = JSON.parse(cachedContent);
-      console.log(`[Client] Loaded cached content for ${page}/${field}:`, parsedContent);
       setContent(parsedContent);
     }
     const fetchContent = async () => {
       setIsLoading(true);
       try {
-        console.log(`[Client] Sending GET request to /api/content/${page}`);
-        const response = await fetch(
-          process.env.NODE_ENV === 'production'
-            ? `https://your-heroku-app.herokuapp.com/api/content/${page}`
-            : `http://localhost:5000/api/content/${page}`
-        );
-        console.log(`[Client] Received response for GET /api/content/${page}, status: ${response.status}`);
+        const response = await fetch(`/api/content/${page}`); // Relative path for proxy
         if (response.ok) {
           const data = await response.json();
-          console.log(`[Client] Fetched data for ${page}:`, data);
           const newContent = data.content?.content?.[field] || initialContent; // Handle nested content
           setContent(newContent);
           localStorage.setItem(`content_${page}_${field}`, JSON.stringify(newContent));
-          console.log(`[Client] Cached new content for ${page}/${field}:`, newContent);
         } else if (!cachedContent) {
-          console.log(`[Client] Fetch failed, using initialContent for ${page}/${field}`);
           setContent(initialContent);
         }
       } catch (err) {
-        console.error(`[Client] Error fetching content for ${page}:`, err);
         if (!cachedContent) setContent(initialContent);
+        setError('Failed to fetch content.');
       } finally {
         setIsLoading(false);
-        console.log(`[Client] Finished loading content for ${page}/${field}`);
       }
     };
     fetchContent();
   }, [page, field, initialContent]);
 
-  // Handle save with logging
+  // Handle save
   const handleSave = async () => {
-    console.log(`[Client] Attempting to save content for ${page}/${field}:`, content);
     if (!isAdmin || !token) {
-      console.log(`[Client] User not admin or no token, caching locally for ${page}/${field}`);
-      alert('Only admins can save changes. Please log in.');
       localStorage.setItem(`content_${page}_${field}`, JSON.stringify(content));
+      setError('Only admins can save changes. Please log in. Content cached locally.');
       setIsEditing(false);
       return;
     }
     setIsLoading(true);
     try {
-      console.log(`[Client] Sending POST request to /api/content/${page} with data:`, { content: { [field]: content } });
       const response = await fetchWithToken(
-        process.env.NODE_ENV === 'production'
-          ? `https://your-heroku-app.herokuapp.com/api/content/${page}`
-          : `http://localhost:5000/api/content/${page}`,
+        `/api/content/${page}`, // Relative path for proxy
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: { [field]: content } }),
         }
       );
-      console.log(`[Client] Received response for POST /api/content/${page}, status: ${response.status}`);
       if (response.ok) {
         const data = await response.json();
-        console.log(`[Client] Saved data for ${page}:`, data);
         const savedContent = data.content?.content?.[field] || content; // Handle nested content
         setContent(savedContent);
         localStorage.setItem(`content_${page}_${field}`, JSON.stringify(savedContent));
-        console.log(`[Client] Updated content and cache for ${page}/${field}:`, savedContent);
+        setSuccess('Content saved successfully!');
         setIsEditing(false);
-        alert('Content saved successfully!');
       } else {
         throw new Error('Failed to save content');
       }
     } catch (err) {
-      console.error(`[Client] Error saving content for ${page}:`, err);
-      alert('Failed to save content: ' + err.message);
+      setError(`Failed to save content: ${err.message}`);
       localStorage.setItem(`content_${page}_${field}`, JSON.stringify(content));
     } finally {
       setIsLoading(false);
-      console.log(`[Client] Finished save attempt for ${page}/${field}`);
     }
   };
 
@@ -103,7 +83,7 @@ const EditableSection = ({ page, initialContent, field }) => {
           <textarea
             value={content || ''}
             onChange={(e) => setContent(e.target.value)}
-            className="w-full p-2 border rounded mb-2 text-gray-900" // Changed text color to dark gray
+            className="w-full p-2 border rounded mb-2 text-gray-900"
             rows="4"
           />
           <button
@@ -132,6 +112,8 @@ const EditableSection = ({ page, initialContent, field }) => {
       ) : (
         <p className="text-gray-700">{content || ''}</p>
       )}
+      {error && <div className="text-red-500 mt-2">{error}</div>}
+      {success && <div className="text-green-500 mt-2">{success}</div>}
     </div>
   );
 };

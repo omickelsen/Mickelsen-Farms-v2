@@ -8,22 +8,21 @@ const ImageUpload = ({ onUpload, page }) => {
   const onDrop = useCallback(
     async (acceptedFiles) => {
       if (!isAdmin) {
-        alert('Only admins can upload images.');
         return;
       }
       const formData = new FormData();
       acceptedFiles.forEach((file) => formData.append('image', file));
 
       try {
-        const response = await fetchWithToken('http://localhost:5000/api/images', {
+        const response = await fetchWithToken('/api/images', {
           method: 'POST',
           body: formData,
-          headers: { 'Page': page || 'default' }, // Add page context to the request
+          headers: { 'Page': page || 'default' },
         });
         const data = await response.json();
         if (onUpload) onUpload(data.url);
       } catch (err) {
-        console.error('Error uploading image:', err);
+        // Error handled silently in production
       }
     },
     [token, isAdmin, onUpload, page]
@@ -43,7 +42,7 @@ const ImageUpload = ({ onUpload, page }) => {
         {isDragActive ? 'Drop the files here...' : 'Drag and drop images here, or click to select files'}
       </p>
     </div>
-  ) : null; // Hide upload area for non-admins
+  ) : null;
 };
 
 export default ImageUpload;

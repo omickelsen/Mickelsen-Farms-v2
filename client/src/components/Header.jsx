@@ -44,7 +44,7 @@ const Header = () => {
 
   useEffect(() => {
     if (isInitialized.current || !window.google || !signInRef.current || !import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-      console.log('Skipping initialization or already initialized');
+      
       return;
     }
 

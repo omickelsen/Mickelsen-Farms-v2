@@ -22,27 +22,17 @@ function HorseBoarding() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const imageResponse = await fetch(
-          process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/images?page=horse-boarding'
-            : 'http://localhost:5000/api/images?page=horse-boarding'
-        );
+        const imageResponse = await fetch('/api/images?page=horse-boarding');
         const imageData = await imageResponse.json();
-        console.log('Fetched image data for HorseBoarding:', imageData);
         setImageUrls(imageData.images || []);
 
-        const pdfResponse = await fetch(
-          process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/pdfs?page=horse-boarding'
-            : 'http://localhost:5000/api/pdfs?page=horse-boarding'
-        );
+        const pdfResponse = await fetch('/api/pdfs?page=horse-boarding');
         if (pdfResponse.ok) {
           const pdfData = await pdfResponse.json();
-          console.log('Fetched PDF data for HorseBoarding:', pdfData);
           setDocumentsPdf(pdfData.pdfs || []);
         }
       } catch (err) {
-        console.error('Error fetching initial data:', err);
+        // Error handled silently in production
       }
     };
     fetchData();
@@ -50,7 +40,6 @@ function HorseBoarding() {
 
   const handleImageUpload = async (event) => {
     if (!isAdmin || !token) {
-      alert('Only admins can upload images. Please log in.');
       return;
     }
 
@@ -61,79 +50,51 @@ function HorseBoarding() {
     Array.from(files).forEach((file) => formData.append('image', file));
 
     try {
-      const uploadResponse = await fetchWithToken(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images'
-          : 'http://localhost:5000/api/images',
-        {
-          method: 'POST',
-          body: formData,
-          headers: { 'Page': 'horse-boarding' },
-        }
-      );
+      const uploadResponse = await fetchWithToken('/api/images', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Page': 'horse-boarding' },
+      });
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
         throw new Error(`Failed to upload image: ${errorText}`);
       }
       const uploadData = await uploadResponse.json();
-      console.log('Upload response:', uploadData);
 
-      const updatedResponse = await fetch(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images?page=horse-boarding'
-          : 'http://localhost:5000/api/images?page=horse-boarding'
-      );
+      const updatedResponse = await fetch('/api/images?page=horse-boarding');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        console.log('Updated images data:', updatedData);
         setImageUrls(updatedData.images || []);
       }
-
-      alert('Images uploaded successfully!');
     } catch (err) {
-      console.error('Error uploading images:', err);
-      alert('Failed to upload images: ' + err.message);
+      // Error handled silently in production
     }
   };
 
   const handleImageDelete = async (urlToRemove) => {
     if (!isAdmin || !token) {
-      alert('Only admins can delete images. Please log in.');
       return;
     }
 
     try {
-      const deleteResponse = await fetchWithToken(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images'
-          : 'http://localhost:5000/api/images',
-        {
-          method: 'DELETE',
-          headers: { 'Page': 'horse-boarding', 'Url': urlToRemove },
-        }
-      );
+      const deleteResponse = await fetchWithToken('/api/images', {
+        method: 'DELETE',
+        headers: { 'Page': 'horse-boarding', 'Url': urlToRemove },
+      });
 
       if (!deleteResponse.ok) {
         const errorText = await deleteResponse.text();
         throw new Error(`Failed to delete image: ${errorText}`);
       }
 
-      const updatedResponse = await fetch(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images?page=horse-boarding'
-          : 'http://localhost:5000/api/images?page=horse-boarding'
-      );
+      const updatedResponse = await fetch('/api/images?page=horse-boarding');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        console.log('Updated images data after delete:', updatedData);
         setImageUrls(updatedData.images || []);
       }
-
-      alert('Image deleted successfully!');
     } catch (err) {
-      console.error('Error deleting image:', err);
-      alert('Failed to delete image: ' + err.message);
+      // Error handled silently in production
     }
   };
 
@@ -149,16 +110,13 @@ function HorseBoarding() {
 
   const handlePdfUpload = (url, section) => {
     if (!isAdmin) {
-      alert('Only admins can upload PDFs.');
       return;
     }
-    console.log('Handling PDF upload with URL:', url, 'for section:', section);
 
     if (section === 'documents') {
       setDocumentsPdf((prev) => {
         const updated = [...prev, url];
         localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updated));
-        console.log('Updated Documents PDF state:', updated);
         return updated;
       });
     }
@@ -166,29 +124,19 @@ function HorseBoarding() {
 
   const handlePdfRemove = async (urlToRemove, section) => {
     if (!isAdmin) {
-      alert('Only admins can remove PDFs.');
       return;
     }
-    console.log('Handling PDF removal with URL:', urlToRemove, 'for section:', section);
 
-    const response = await fetch(
-      process.env.NODE_ENV === 'production'
-        ? 'https://your-heroku-app.herokuapp.com/api/pdfs'
-        : 'http://localhost:5000/api/pdfs',
-      {
-        method: 'DELETE',
-        headers: { 'Page': 'horse-boarding', 'Url': urlToRemove },
-      }
-    );
+    const response = await fetchWithToken('/api/pdfs', {
+      method: 'DELETE',
+      headers: { 'Page': 'horse-boarding', 'Url': urlToRemove },
+    });
     if (response.ok) {
       setDocumentsPdf((prev) => {
         const updated = prev.filter((url) => url !== urlToRemove);
         localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updated));
-        console.log('Updated Documents PDF state after removal:', updated);
         return updated;
       });
-    } else {
-      console.error('Failed to remove PDF:', await response.text());
     }
   };
 
@@ -258,7 +206,6 @@ function HorseBoarding() {
         </div>
       </div>
 
-      {/* Modal for larger image view */}
       {selectedImage && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={closeModal}>
           <div className="relative">

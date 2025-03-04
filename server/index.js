@@ -1,3 +1,4 @@
+console.log('Starting server...');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -40,8 +41,8 @@ app.use(cors({
 }));
 
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {})
-  .catch(err => {});
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 const { OAuth2Client } = require('google-auth-library');
 const oauth2Client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage');
@@ -152,7 +153,7 @@ app.post('/api/images', authenticateToken, upload.single('image'), async (req, r
   if (!req.file || !req.file.filename) {
     return res.status(400).json({ error: 'No valid image provided' });
   }
-  const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  const url = `/uploads/${req.file.filename}`; // Relative URL for Heroku
   const page = req.headers['page'] || 'default';
 
   try {
@@ -177,9 +178,12 @@ app.get('/api/images', async (req, res) => {
   try {
     const background = await HeroBackground.findOne({ page });
     const images = background ? (background.urls.length > 0 ? background.urls : [background.url || '']) : [];
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json({ images });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch images' });
+    res.status(500).json({ error: 'Failed to fetch images', details: err.message });
   }
 });
 
@@ -219,7 +223,7 @@ app.post('/api/pdfs', authenticateToken, upload.single('pdf'), async (req, res) 
   if (!req.file || !req.file.filename || !req.file.mimetype.startsWith('application/pdf')) {
     return res.status(400).json({ error: 'No valid PDF provided' });
   }
-  const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  const url = `/uploads/${req.file.filename}`; // Relative URL for Heroku
   const page = req.headers['page'] || 'default';
 
   try {
@@ -309,15 +313,19 @@ app.post('/api/hero-background', async (req, res) => {
   }
 });
 
-// Serve React build in production
+// Serve React build in production, excluding API routes
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/build')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      next(); // Pass to API routes
+    } else {
+      res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+    }
   });
 }
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT);
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 module.exports = app;

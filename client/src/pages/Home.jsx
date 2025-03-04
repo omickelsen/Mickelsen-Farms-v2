@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { fetchWithToken } from '../context/AuthContext';
 import Calendar from './Calendar';
 import ServicesSection from '../components/ServicesSection';
@@ -23,6 +23,9 @@ function Home() {
         const data = await response.json();
         setCarouselImages(data.images || []);
       } catch (err) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error fetching carousel images:', err);
+        }
         setCarouselImages([]);
       } finally {
         setLoadingImages(false);
@@ -47,6 +50,9 @@ function Home() {
         setMessage('Failed to submit request.');
       }
     } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error submitting request:', err);
+      }
       setMessage('Error submitting request: ' + err.message);
     }
   };

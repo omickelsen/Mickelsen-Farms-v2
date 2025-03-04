@@ -8,7 +8,7 @@ import { useAuth, fetchWithToken } from '../context/AuthContext';
 // Function to extract the original filename from URL, removing the timestamp prefix
 const getFilenameFromUrl = (url) => {
   const parts = url.substring(url.lastIndexOf('/') + 1).split('-');
-  return parts.slice(1).join('-'); // Join remaining parts after removing the timestamp
+  return parts.slice(1).join('-');
 };
 
 function Events() {
@@ -30,24 +30,18 @@ function Events() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const imageResponse = await fetch(
-          process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/images?page=events'
-            : 'http://localhost:5000/api/images?page=events'
-        );
+        const imageResponse = await fetch('/api/images?page=events');
         const imageData = await imageResponse.json();
-        console.log('Fetched image data for Events (initial):', imageData);
         setImageUrls(imageData.images || []);
       } catch (err) {
-        console.error('Error fetching initial image data:', err);
+        // Error handled silently in production
       }
     };
     fetchData();
-  }, []); // Empty dependency array to run once
+  }, []);
 
   const handleImageUpload = async (event) => {
     if (!isAdmin) {
-      alert('Only admins can upload images.');
       return;
     }
 
@@ -58,81 +52,51 @@ function Events() {
     Array.from(files).forEach((file) => formData.append('image', file));
 
     try {
-      const uploadResponse = await fetchWithToken(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images'
-          : 'http://localhost:5000/api/images',
-        {
-          method: 'POST',
-          body: formData,
-          headers: { 'Page': 'events' },
-        }
-      );
+      const uploadResponse = await fetchWithToken('/api/images', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Page': 'events' },
+      });
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
         throw new Error(`Failed to upload image: ${errorText}`);
       }
       const uploadData = await uploadResponse.json();
-      console.log('Upload response:', uploadData);
 
-      // Re-fetch updated images
-      const updatedResponse = await fetch(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images?page=events'
-          : 'http://localhost:5000/api/images?page=events'
-      );
+      const updatedResponse = await fetch('/api/images?page=events');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        console.log('Updated images data:', updatedData);
         setImageUrls(updatedData.images || []);
       }
-
-      alert('Images uploaded successfully!');
     } catch (err) {
-      console.error('Error uploading images:', err);
-      alert('Failed to upload images: ' + err.message);
+      // Error handled silently in production
     }
   };
 
   const handleImageDelete = async (urlToRemove) => {
     if (!isAdmin) {
-      alert('Only admins can delete images.');
       return;
     }
 
     try {
-      const deleteResponse = await fetchWithToken(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images'
-          : 'http://localhost:5000/api/images',
-        {
-          method: 'DELETE',
-          headers: { 'Page': 'events', 'Url': urlToRemove },
-        }
-      );
+      const deleteResponse = await fetchWithToken('/api/images', {
+        method: 'DELETE',
+        headers: { 'Page': 'events', 'Url': urlToRemove },
+      });
 
       if (!deleteResponse.ok) {
         const errorText = await deleteResponse.text();
         throw new Error(`Failed to delete image: ${errorText}`);
       }
 
-      // Re-fetch after deletion
-      const updatedResponse = await fetch(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/images?page=events'
-          : 'http://localhost:5000/api/images?page=events'
-      );
+      const updatedResponse = await fetch('/api/images?page=events');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        console.log('Updated images data after delete:', updatedData);
         setImageUrls(updatedData.images || []);
       }
-
-      alert('Image deleted successfully!');
     } catch (err) {
-      console.error('Error deleting image:', err);
-      alert('Failed to delete image: ' + err.message);
+      // Error handled silently in production
     }
   };
 
@@ -148,30 +112,25 @@ function Events() {
 
   const handlePdfUpload = (url, section) => {
     if (!isAdmin) {
-      alert('Only admins can upload PDFs.');
       return;
     }
-    console.log('Handling PDF upload with URL:', url, 'for section:', section);
 
     if (section === 'dayCamp') {
       setDayCampPdf((prev) => {
         const updated = [...prev, url];
         localStorage.setItem('events_dayCampPdf', JSON.stringify(updated));
-        console.log('Updated Day Camp PDF state:', updated);
         return updated;
       });
     } else if (section === 'party') {
       setPartyPdf((prev) => {
         const updated = [...prev, url];
         localStorage.setItem('events_partyPdf', JSON.stringify(updated));
-        console.log('Updated Party PDF state:', updated);
         return updated;
       });
     } else if (section === 'waiver') {
       setWaiverPdf((prev) => {
         const updated = [...prev, url];
         localStorage.setItem('events_waiverPdf', JSON.stringify(updated));
-        console.log('Updated Waiver PDF state:', updated);
         return updated;
       });
     }
@@ -179,45 +138,33 @@ function Events() {
 
   const handlePdfRemove = async (urlToRemove, section) => {
     if (!isAdmin) {
-      alert('Only admins can remove PDFs.');
       return;
     }
-    console.log('Handling PDF removal with URL:', urlToRemove, 'from section:', section);
 
-    const response = await fetchWithToken(
-      process.env.NODE_ENV === 'production'
-        ? 'https://your-heroku-app.herokuapp.com/api/pdfs'
-        : 'http://localhost:5000/api/pdfs',
-      {
-        method: 'DELETE',
-        headers: { 'Page': 'events', 'Url': urlToRemove },
-      }
-    );
+    const response = await fetchWithToken('/api/pdfs', {
+      method: 'DELETE',
+      headers: { 'Page': 'events', 'Url': urlToRemove },
+    });
     if (response.ok) {
       if (section === 'dayCamp') {
         setDayCampPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
           localStorage.setItem('events_dayCampPdf', JSON.stringify(updated));
-          console.log('Updated Day Camp PDF state after removal:', updated);
           return updated;
         });
       } else if (section === 'party') {
         setPartyPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
           localStorage.setItem('events_partyPdf', JSON.stringify(updated));
-          console.log('Updated Party PDF state after removal:', updated);
           return updated;
         });
       } else if (section === 'waiver') {
         setWaiverPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
           localStorage.setItem('events_waiverPdf', JSON.stringify(updated));
-          console.log('Updated Waiver PDF state after removal:', updated);
           return updated;
         });
       }
-    } else {
-      console.error('Failed to remove PDF:', await response.text());
     }
   };
 
@@ -306,7 +253,6 @@ function Events() {
         </div>
       </div>
 
-      {/* Modal for larger image view */}
       {selectedImage && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={closeModal}>
           <div className="relative">

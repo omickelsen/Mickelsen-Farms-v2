@@ -8,11 +8,9 @@ const PdfUpload = ({ onUpload, page }) => {
     async (event) => {
       const file = event.target.files[0];
       if (!isAdmin || !token) {
-        alert('Only admins can upload PDFs.');
         return;
       }
       if (!file || !file.type.startsWith('application/pdf')) {
-        alert('Please upload a valid PDF file.');
         return;
       }
 
@@ -20,22 +18,16 @@ const PdfUpload = ({ onUpload, page }) => {
       formData.append('pdf', file);
 
       try {
-        const response = await fetchWithToken(
-          process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/pdfs'
-            : 'http://localhost:5000/api/pdfs',
-          {
-            method: 'POST',
-            body: formData,
-            headers: { 'Page': page },
-          }
-        );
+        const response = await fetchWithToken('/api/pdfs', {
+          method: 'POST',
+          body: formData,
+          headers: { 'Page': page },
+        });
         if (!response.ok) throw new Error('Failed to upload PDF');
         const data = await response.json();
         if (onUpload) onUpload(data.url);
       } catch (err) {
-        console.error('Error uploading PDF:', err);
-        alert('Failed to upload PDF: ' + err.message);
+        // Error handled silently in production
       }
     },
     [token, isAdmin, onUpload, page]

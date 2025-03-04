@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import AdminImageUpload from './AdminImageUpload';
 import { fetchWithToken } from '../context/AuthContext';
 import { useAuth } from '../context/AuthContext';
@@ -10,23 +10,40 @@ const CarouselComponent = ({
   setCurrentImageIndex,
 }) => {
   const { token, isAdmin } = useAuth();
+  const [originalImages, setOriginalImages] = useState([]);
+  const [error, setError] = useState(null);
 
-  // Fetch images for the 'carousel' page
   useEffect(() => {
     const fetchImages = async () => {
       try {
-        const response = await fetch(
-          process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/images?page=carousel'
-            : 'http://localhost:5000/api/images?page=carousel'
-        );
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const cacheBuster = new Date().getTime();
+        if (process.env.NODE_ENV === 'development') {
+          
+        }
+        const response = await fetch(`/api/images?page=carousel&t=${cacheBuster}`);
+        if (process.env.NODE_ENV === 'development') {
+          
+        }
+        if (!response.ok && response.status !== 304) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-        console.log('Carousel fetched images data:', data); // Debugging
-        setImages(data.images || []);
+        if (process.env.NODE_ENV === 'development') {
+          
+        }
+        const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+        const fullUrls = data.images.map(url => {
+          const cleanUrl = url.startsWith('http') ? url.replace(/^http:\/\/localhost:5000/, '') : url;
+          return `${baseUrl}${cleanUrl}`;
+        });
+        setOriginalImages(data.images || []);
+        setImages(fullUrls);
+        setError(null); // Clear error on successful fetch
       } catch (err) {
-        console.error('Error fetching carousel images:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error fetching carousel images:', err);
+        }
         setImages([]);
+        setOriginalImages([]);
+        setError('Failed to load carousel images');
       }
     };
     fetchImages();
@@ -35,7 +52,7 @@ const CarouselComponent = ({
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
-    }, 8000); // 8-second interval
+    }, 8000);
     return () => clearInterval(interval);
   }, [images.length, setCurrentImageIndex]);
 
@@ -47,67 +64,33 @@ const CarouselComponent = ({
     setCurrentImageIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
   };
 
-  const handleImageUpload = async (newImage) => {
-    if (isAdmin && token) {
-      try {
-        const formData = new FormData();
-        formData.append('image', newImage);
-        console.log('Uploading image:', newImage.name); // Debug file
-        const response = await fetchWithToken(
-          process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/images'
-            : 'http://localhost:5000/api/images',
-          {
-            method: 'POST',
-            body: formData,
-            headers: { 'Page': 'carousel' },
-          }
-        );
-        if (!response.ok) throw new Error(`Upload failed with status: ${response.status}`);
-        const data = await response.json();
-        console.log('Upload response data:', data); // Debug response
-        if (data.url) {
-          setImages((prevImages) => [...prevImages, data.url]);
-        } else {
-          console.error('No URL in response:', data);
-          alert('Upload failed: No valid image URL returned.');
-        }
-      } catch (err) {
-        console.error('Error uploading image:', err);
-        alert('Failed to upload image: ' + err.message);
-      }
-    } else {
-      alert('Only admins can upload images.');
-    }
-  };
-
   const handleRemoveImage = async (index) => {
     if (isAdmin && token) {
       try {
         const urlToRemove = images[index];
+        const originalUrl = originalImages[index] || urlToRemove.replace(/^http:\/\/localhost:5000/, '');
         const response = await fetchWithToken(
-          process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/images'
-            : 'http://localhost:5000/api/images',
+          '/api/images',
           {
             method: 'DELETE',
             headers: {
               'Page': 'carousel',
-              'Url': urlToRemove,
+              'Url': originalUrl,
             },
           }
         );
-        if (!response.ok) throw new Error(`Delete failed with status: ${response.status}`);
+        if (!response.ok) throw new Error('Delete failed');
         setImages((prevImages) => prevImages.filter((_, i) => i !== index));
+        setOriginalImages((prev) => prev.filter((_, i) => i !== index));
         if (currentImageIndex >= images.length - 1) {
           setCurrentImageIndex(0);
         }
+        setError(null); // Clear error on successful delete
       } catch (err) {
-        console.error('Error removing image:', err);
-        alert('Failed to remove image: ' + err.message);
+        alert('Failed to remove image: ' + err.message); // Keep alert for user action feedback
       }
     } else {
-      alert('Only admins can remove images.');
+      alert('Only admins can remove images.'); // Keep alert for authorization feedback
     }
   };
 
@@ -119,7 +102,14 @@ const CarouselComponent = ({
             src={images[currentImageIndex]}
             alt="Farm Facilities"
             className="w-full h-96 object-cover rounded-lg transition-opacity duration-1000 ease-in-out"
-            onError={(e) => console.log('Image load error for:', images[currentImageIndex])} // Debug image load
+            onError={(e) => {
+              if (process.env.NODE_ENV === 'development') {
+                console.error('Image load error:', e.target.src, e);
+              }
+              setError('Image failed to load, carousel reset');
+              setImages([]);
+              setOriginalImages([]);
+            }}
           />
           <button
             onClick={handlePrevImage}
@@ -137,7 +127,12 @@ const CarouselComponent = ({
           </button>
         </>
       )}
-      {isAdmin && <AdminImageUpload onImageUpload={handleImageUpload} />}
+      {error && <div className="text-red-500 mt-2">{error}</div>}
+      {isAdmin && <AdminImageUpload onImageUpload={(url) => {
+        const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+        const cleanUrl = url.startsWith('http') ? url.replace(/^http:\/\/localhost:5000/, '') : url;
+        setImages((prev) => [...prev, `${baseUrl}${cleanUrl}`]);
+      }} />}
       {isAdmin && images.length > 0 && (
         <div className="mt-2">
           {images.map((img, index) => (
