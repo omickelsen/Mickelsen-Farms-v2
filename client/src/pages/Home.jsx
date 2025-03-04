@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchWithToken } from '../context/AuthContext';
 import Calendar from './Calendar';
 import ServicesSection from '../components/ServicesSection';
@@ -18,17 +18,11 @@ function Home() {
     const fetchImages = async () => {
       setLoadingImages(true);
       try {
-        const response = await fetch(
-          process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/images?page=carousel'
-            : 'http://localhost:5000/api/images?page=carousel'
-        );
+        const response = await fetch('/api/images?page=carousel');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-        console.log('Fetched carousel images data:', data); // Debugging
         setCarouselImages(data.images || []);
       } catch (err) {
-        console.error('Error pre-loading carousel images:', err);
         setCarouselImages([]);
       } finally {
         setLoadingImages(false);
@@ -41,16 +35,11 @@ function Home() {
   const handleRequestSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/requests'
-          : 'http://localhost:5000/api/requests',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ request }),
-        }
-      );
+      const response = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request }),
+      });
       if (response.ok) {
         setMessage('Request submitted successfully!');
         setRequest('');

@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
+  "proxy": "http://localhost:5000",
   "dependencies": {
     "autoprefixer": "^10.4.20",
     "date-fns": "^4.1.0",
