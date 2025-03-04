@@ -8,18 +8,17 @@ import { useAuth, fetchWithToken } from '../context/AuthContext';
 // Function to extract the original filename from URL, removing the timestamp prefix
 const getFilenameFromUrl = (url) => {
   const parts = url.substring(url.lastIndexOf('/') + 1).split('-');
-  return parts.slice(1).join('-'); // Join remaining parts after removing the timestamp
+  return parts.slice(1).join('-');
 };
 
 function HorseBoarding() {
-  const { isAdmin, token } = useAuth();
+  const { isAdmin, token } = useAuth() || {};
   const [imageUrls, setImageUrls] = useState([]);
   const [documentsPdf, setDocumentsPdf] = useState(() => {
     const saved = localStorage.getItem('horseBoarding_documentsPdf');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Fetch data only once on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -29,18 +28,29 @@ function HorseBoarding() {
             : 'http://localhost:5000/api/images?page=horse-boarding'
         );
         const imageData = await imageResponse.json();
-        console.log('Fetched image data for HorseBoarding (initial):', imageData);
+        console.log('Fetched image data for HorseBoarding:', imageData);
         setImageUrls(imageData.images || []);
+
+        const pdfResponse = await fetch(
+          process.env.NODE_ENV === 'production'
+            ? 'https://your-heroku-app.herokuapp.com/api/pdfs?page=horse-boarding'
+            : 'http://localhost:5000/api/pdfs?page=horse-boarding'
+        );
+        if (pdfResponse.ok) {
+          const pdfData = await pdfResponse.json();
+          console.log('Fetched PDF data for HorseBoarding:', pdfData);
+          setDocumentsPdf(pdfData.pdfs || []);
+        }
       } catch (err) {
-        console.error('Error fetching initial image data:', err);
+        console.error('Error fetching initial data:', err);
       }
     };
     fetchData();
-  }, []); // Empty dependency array to run once
+  }, []);
 
   const handleImageUpload = async (event) => {
-    if (!isAdmin) {
-      alert('Only admins can upload images.');
+    if (!isAdmin || !token) {
+      alert('Only admins can upload images. Please log in.');
       return;
     }
 
@@ -69,7 +79,6 @@ function HorseBoarding() {
       const uploadData = await uploadResponse.json();
       console.log('Upload response:', uploadData);
 
-      // Re-fetch updated images
       const updatedResponse = await fetch(
         process.env.NODE_ENV === 'production'
           ? 'https://your-heroku-app.herokuapp.com/api/images?page=horse-boarding'
@@ -89,8 +98,8 @@ function HorseBoarding() {
   };
 
   const handleImageDelete = async (urlToRemove) => {
-    if (!isAdmin) {
-      alert('Only admins can delete images.');
+    if (!isAdmin || !token) {
+      alert('Only admins can delete images. Please log in.');
       return;
     }
 
@@ -110,7 +119,6 @@ function HorseBoarding() {
         throw new Error(`Failed to delete image: ${errorText}`);
       }
 
-      // Re-fetch after deletion
       const updatedResponse = await fetch(
         process.env.NODE_ENV === 'production'
           ? 'https://your-heroku-app.herokuapp.com/api/images?page=horse-boarding'
@@ -139,7 +147,6 @@ function HorseBoarding() {
     setSelectedImage(null);
   };
 
-  // Existing PDF handling functions
   const handlePdfUpload = (url, section) => {
     if (!isAdmin) {
       alert('Only admins can upload PDFs.');
@@ -162,9 +169,9 @@ function HorseBoarding() {
       alert('Only admins can remove PDFs.');
       return;
     }
-    console.log('Handling PDF removal with URL:', urlToRemove, 'from section:', section);
+    console.log('Handling PDF removal with URL:', urlToRemove, 'for section:', section);
 
-    const response = await fetchWithToken(
+    const response = await fetch(
       process.env.NODE_ENV === 'production'
         ? 'https://your-heroku-app.herokuapp.com/api/pdfs'
         : 'http://localhost:5000/api/pdfs',
@@ -192,23 +199,11 @@ function HorseBoarding() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h3 className="text-2xl font-semibold text-teal-600 mb-4">Overview</h3>
-            <EditableSection page="horse-boarding" initialContent="Top-notch horse boarding with spacious stalls, daily care, and training facilities. Use of all the facility
-Lighted indoor arena 40 X 60
-Lighted Outdoor arean 72 X 72
-Enclosed stalls and daily turnout
-Stalls cleaned 3X per week
-High quality alfalfa feed and pasture turn out in the summer
-Fresh water
-Use of tack room and storage of tack
-Use of barn equipment-whips, jumps, barrels, etc.
-Health records kept on every horse boarded at our facility" field="overview" />
+            <EditableSection page="horse-boarding" initialContent="Top-notch horse boarding with spacious stalls, daily care, and training facilities." field="overview" />
           </div>
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h3 className="text-2xl font-semibold text-teal-600 mb-4">Pricing</h3>
-            <EditableSection page="horse-boarding" initialContent="Currently: $400 per month.
-$50 initial deposit
-Extra Fees for special requests (SawDust)
-Boarding fees are subject to change subject to change based off of feed cost." field="pricing" />
+            <EditableSection page="horse-boarding" initialContent="Currently: $400 per month. $50 initial deposit. Extra Fees for special requests (SawDust). Boarding fees are subject to change based off of feed cost." field="pricing" />
           </div>
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h3 className="text-2xl font-semibold text-teal-600 mb-4">Extras</h3>

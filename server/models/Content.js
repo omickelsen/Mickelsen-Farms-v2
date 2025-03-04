@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
+
 const contentSchema = new mongoose.Schema({
-  page: { type: String, required: true, unique: true },
-  content: { type: String, required: true },
+  page: { type: String, required: true },
+  content: { type: Object, default: {} },
 });
-module.exports = mongoose.model('Content', contentSchema);
+
+// Use a factory function to avoid multiple compilations
+module.exports = mongoose.models.Content || mongoose.model('Content', contentSchema, 'contents');
