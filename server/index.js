@@ -20,7 +20,7 @@ app.use(cors({
   origin: process.env.NODE_ENV === 'production' ? 'https://your-heroku-app.herokuapp.com' : 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Page', 'Url'], // Added 'Url' for DELETE
   optionsSuccessStatus: 200,
 }));
 
@@ -56,21 +56,23 @@ const authenticateToken = async (req, res, next) => {
   next();
 };
 
-// MongoDB schema for hero background image
+// MongoDB schema for hero background image with multiple URLs
 const heroBackgroundSchema = new mongoose.Schema({
-  url: { type: String, required: true },
+  urls: [{ type: String, required: true }], // Array of image URLs
+  page: { type: String, required: true },
 });
-const HeroBackground = mongoose.model('HeroBackground', heroBackgroundSchema);
+const HeroBackground = mongoose.model('HeroBackground', heroBackgroundSchema, 'heroBackgrounds');
 
-// Initialize with default image if none exists
 mongoose.connection.once('open', async () => {
-  const existing = await HeroBackground.findOne();
-  if (!existing) {
-    await HeroBackground.create({ url: '/path-to-farm-image.jpg' });
+  const pages = ['horse-boarding', 'horse-lessons', 'trail-rides', 'events', 'default', 'carousel'];
+  for (const page of pages) {
+    const existing = await HeroBackground.findOne({ page });
+    if (!existing) {
+      await HeroBackground.create({ urls: [`/path-to-${page}-image.jpg`], page });
+    }
   }
 });
 
-// Image Upload Configuration
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = path.join(__dirname, 'uploads');
@@ -83,55 +85,101 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname);
   },
 });
-const upload = multer({ storage: storage });
+const upload = multer({ storage: storage});
 
-// Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Apply authentication middleware to specific routes
 app.use('/api/calendar', authenticateToken);
 app.use('/api/content', authenticateToken);
 app.use('/api/images', (req, res, next) => {
-  if (req.method === 'POST') return authenticateToken(req, res, next);
+  if (req.method === 'POST' || req.method === 'DELETE') return authenticateToken(req, res, next);
   next();
 });
-app.use('/api/hero-background', authenticateToken); // Ensure this route uses authentication
+app.use('/api/hero-background', authenticateToken);
 
-// Register routers
 app.use('/auth', authRouter);
 app.use('/api/calendar', calendarRouter);
 app.use('/api/content', contentRouter);
 
-// Image endpoints
-app.post('/api/images', authenticateToken, upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No image provided' });
-  }
+app.post('/api/images', authenticateToken, upload.single('image'), async (req, res) => {
   if (!req.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
+  if (!req.file || !req.file.filename) {
+    return res.status(400).json({ error: 'No valid image provided' });
+  }
   const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  const page = req.headers['page'] || 'default';
+
+  const background = await HeroBackground.findOne({ page });
+  if (background) {
+    await HeroBackground.findOneAndUpdate(
+      { page },
+      { $push: { urls: url } },
+      { new: true }
+    );
+  } else {
+    await HeroBackground.create({ urls: [url], page });
+  }
+  console.log('Uploaded image URL:', url); // Debug log
   res.json({ url });
 });
 
-app.get('/api/images', (req, res) => {
+app.get('/api/images', async (req, res) => {
+  const page = req.query.page || 'default';
   const uploadDir = path.join(__dirname, 'uploads');
   fs.readdir(uploadDir, (err, files) => {
     if (err) {
       console.error('Error reading uploads directory:', err);
       return res.status(500).json({ error: 'Failed to read images' });
     }
-    const imageUrls = files.map(file => `${req.protocol}://${req.get('host')}/uploads/${file}`);
-    console.log('Returning image URLs:', imageUrls);
-    res.json({ images: imageUrls });
+    HeroBackground.findOne({ page })
+      .then((doc) => {
+        if (!doc) {
+          return res.json({ images: [] });
+        }
+        res.json({ images: doc.urls });
+      })
+      .catch((err) => {
+        console.error('Error querying HeroBackground:', err);
+        res.status(500).json({ error: 'Failed to fetch images' });
+      });
   });
 });
 
-// Hero background endpoints
+app.delete('/api/images', authenticateToken, async (req, res) => {
+  if (!req.isAdmin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  const page = req.headers['page'] || 'default';
+  const urlToRemove = req.headers['url'];
+
+  if (!urlToRemove) {
+    return res.status(400).json({ error: 'URL to remove is required' });
+  }
+
+  try {
+    const background = await HeroBackground.findOne({ page });
+    if (background && background.urls.includes(urlToRemove)) {
+      await HeroBackground.findOneAndUpdate(
+        { page },
+        { $pull: { urls: urlToRemove } },
+        { new: true }
+      );
+      res.json({ message: 'Image removed successfully' });
+    } else {
+      res.status(404).json({ error: 'Image not found' });
+    }
+  } catch (err) {
+    console.error('Error removing image:', err);
+    res.status(500).json({ error: 'Failed to remove image' });
+  }
+});
+
 app.get('/api/hero-background', async (req, res) => {
   try {
-    const background = await HeroBackground.findOne();
-    res.json({ url: background ? background.url : '/path-to-farm-image.jpg' });
+    const background = await HeroBackground.findOne({ page: 'default' });
+    res.json({ url: background ? background.urls[0] : '/path-to-farm-image.jpg' });
   } catch (err) {
     console.error('Error fetching hero background:', err);
     res.status(500).json({ error: 'Failed to fetch hero background' });
@@ -147,7 +195,7 @@ app.post('/api/hero-background', async (req, res) => {
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
     }
-    await HeroBackground.findOneAndUpdate({}, { url }, { upsert: true, new: true });
+    await HeroBackground.findOneAndUpdate({ page: 'default' }, { $set: { urls: [url] } }, { upsert: true, new: true });
     res.json({ url });
   } catch (err) {
     console.error('Error updating hero background:', err);
@@ -155,7 +203,6 @@ app.post('/api/hero-background', async (req, res) => {
   }
 });
 
-// Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 

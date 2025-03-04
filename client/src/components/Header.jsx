@@ -12,9 +12,9 @@ const Header = () => {
 
   const navItems = [
     { label: 'About Us', route: '/', sectionId: '#about' },
-    { label: 'Services', route: '/horse-boarding', sectionId: '#services' },
+    { label: 'Services', route: '/', sectionId: '#services' }, // Updated route to '/'
     { label: 'Calendar', route: '/calendar', sectionId: '#calendar' },
-    { label: 'Contact Us', route: '/contact', sectionId: '#contact' },
+    { label: 'Contact Us', route: '/', sectionId: '#contact' },
   ];
 
   const handleNavClick = (route, sectionId) => {
@@ -44,7 +44,7 @@ const Header = () => {
 
   useEffect(() => {
     if (isInitialized.current || !window.google || !signInRef.current || !import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-      console.log('Skipping initialization or already initialized'); // Generic log
+      console.log('Skipping initialization or already initialized');
       return;
     }
 
@@ -66,18 +66,15 @@ const Header = () => {
         type: 'standard',
       });
 
-      if (!token) {
-        window.google.accounts.id.prompt();
-      }
-
+      
       isInitialized.current = true;
     } catch (error) {
-      console.error('Error initializing Google Sign-In:', error.message); // Generic error
+      console.error('Error initializing Google Sign-In:', error.message);
     }
   }, [token]);
 
   const handleCredentialResponse = (response) => {
-    console.log('Login successful'); // Safe log
+    console.log('Login successful');
     localStorage.setItem('googleIdToken', response.credential);
     window.location.href = '/';
   };

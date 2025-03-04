@@ -3,21 +3,21 @@ import { useAuth, fetchWithToken } from '../context/AuthContext';
 
 const HeroSection = () => {
   const { token, isAdmin } = useAuth();
-  const [backgroundImage, setBackgroundImage] = useState('/path-to-farm-image.jpg'); // Default image
+  const [backgroundImage, setBackgroundImage] = useState('/path-to-farm-image.jpg');
   const [isUploading, setIsUploading] = useState(false);
 
-  // Fetch the hero-specific background image on mount
   useEffect(() => {
     const fetchHeroBackground = async () => {
       try {
         const response = await fetch(
           process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/hero-background'
-            : 'http://localhost:5000/api/hero-background'
+            ? 'https://your-heroku-app.herokuapp.com/api/images?page=default'
+            : 'http://localhost:5000/api/images?page=default'
         );
         if (response.ok) {
           const data = await response.json();
-          setBackgroundImage(data.url || '/path-to-farm-image.jpg');
+          console.log('Hero fetched images data:', data); // Debugging
+          setBackgroundImage(data.images[0] || '/path-to-farm-image.jpg');
         }
       } catch (err) {
         console.error('Error fetching hero background:', err);
@@ -26,7 +26,6 @@ const HeroSection = () => {
     fetchHeroBackground();
   }, []);
 
-  // Handle image upload and update hero background
   const handleImageUpload = async (event) => {
     if (!isAdmin || !token) {
       alert('Only admins can change the background image.');
@@ -48,6 +47,7 @@ const HeroSection = () => {
         {
           method: 'POST',
           body: formData,
+          headers: { 'Page': 'default' },
         }
       );
 
@@ -55,18 +55,6 @@ const HeroSection = () => {
       const uploadData = await uploadResponse.json();
       const newImageUrl = uploadData.url;
 
-      const updateResponse = await fetchWithToken(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-heroku-app.herokuapp.com/api/hero-background'
-          : 'http://localhost:5000/api/hero-background',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: newImageUrl }),
-        }
-      );
-
-      if (!updateResponse.ok) throw new Error('Failed to update hero background');
       setBackgroundImage(newImageUrl);
       alert('Background image updated successfully!');
     } catch (err) {

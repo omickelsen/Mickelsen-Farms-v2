@@ -3,13 +3,13 @@ import { fetchWithToken } from '../context/AuthContext';
 import Calendar from './Calendar';
 import ServicesSection from '../components/ServicesSection';
 import CarouselComponent from '../components/CarouselComponent';
-import HeroSection from '../components/HeroSection'; // Import the new component
+import HeroSection from '../components/HeroSection';
 import { useAuth } from '../context/AuthContext';
 
 function Home() {
   const [request, setRequest] = useState('');
   const [message, setMessage] = useState('');
-  const [images, setImages] = useState([]);
+  const [carouselImages, setCarouselImages] = useState([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loadingImages, setLoadingImages] = useState(true);
   const { token } = useAuth();
@@ -20,15 +20,16 @@ function Home() {
       try {
         const response = await fetch(
           process.env.NODE_ENV === 'production'
-            ? 'https://your-heroku-app.herokuapp.com/api/images'
-            : 'http://localhost:5000/api/images'
+            ? 'https://your-heroku-app.herokuapp.com/api/images?page=carousel'
+            : 'http://localhost:5000/api/images?page=carousel'
         );
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-        setImages(data.images || []);
+        console.log('Fetched carousel images data:', data); // Debugging
+        setCarouselImages(data.images || []);
       } catch (err) {
-        console.error('Error pre-loading images:', err);
-        setImages([]);
+        console.error('Error pre-loading carousel images:', err);
+        setCarouselImages([]);
       } finally {
         setLoadingImages(false);
       }
@@ -63,7 +64,7 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <HeroSection /> {/* Use the new component */}
+      <HeroSection />
       <section id="about" className="py-10 md:py-16">
         <div className="container">
           <h2 className="section-title">About Us</h2>
@@ -73,8 +74,8 @@ function Home() {
               <p className="text-center">Loading images...</p>
             ) : (
               <CarouselComponent
-                images={images}
-                setImages={setImages}
+                images={carouselImages}
+                setImages={setCarouselImages}
                 currentImageIndex={currentImageIndex}
                 setCurrentImageIndex={setCurrentImageIndex}
               />
@@ -121,6 +122,6 @@ function Home() {
       </section>
     </div>
   );
-};
+}
 
 export default Home;

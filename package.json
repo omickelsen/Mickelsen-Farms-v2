@@ -1,0 +1,26 @@
+{
+  "name": "mickelsen-farms-v2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "concurrently \"cd client && npm run dev\" \"cd server && node index.js\"",
+    "dev": "concurrently \"cd client && npm run dev\" \"cd server && node --inspect index.js\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "concurrently": "^8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omickelsen/Mickelsen-Farms-v2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/omickelsen/Mickelsen-Farms-v2/issues"
+  },
+  "homepage": "https://github.com/omickelsen/Mickelsen-Farms-v2#readme"
+}
