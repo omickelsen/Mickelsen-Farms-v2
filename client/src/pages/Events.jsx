@@ -12,11 +12,8 @@ const getFilenameFromUrl = (url) => {
 };
 
 function Events() {
-  const { isAdmin } = useAuth();
-  const [imageUrls, setImageUrls] = useState(() => {
-    const saved = localStorage.getItem('events_imageUrls');
-    return saved ? JSON.parse(saved) : ['/path-to-event1.jpg', '/path-to-event2.jpg'];
-  });
+  const { isAdmin, token } = useAuth();
+  const [imageUrls, setImageUrls] = useState([]);
   const [dayCampPdf, setDayCampPdf] = useState(() => {
     const saved = localStorage.getItem('events_dayCampPdf');
     return saved ? JSON.parse(saved) : [];
@@ -30,7 +27,6 @@ function Events() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Fetch data on mount only
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -40,30 +36,114 @@ function Events() {
             : 'http://localhost:5000/api/images?page=events'
         );
         const imageData = await imageResponse.json();
-        console.log('Fetched image data for Events (once):', imageData);
-        setImageUrls(imageData.images.length ? imageData.images : ['/path-to-event1.jpg', '/path-to-event2.jpg']);
-        // No PDF fetch; using localStorage
+        console.log('Fetched image data for Events (initial):', imageData);
+        setImageUrls(imageData.images || []);
       } catch (err) {
-        console.error('Error fetching image data:', err);
+        console.error('Error fetching initial image data:', err);
       }
     };
     fetchData();
-  }, []); // Empty dependency array to run once on mount
+  }, []); // Empty dependency array to run once
 
-  // Persist state to localStorage on change
-  useEffect(() => {
-    localStorage.setItem('events_imageUrls', JSON.stringify(imageUrls));
-    localStorage.setItem('events_dayCampPdf', JSON.stringify(dayCampPdf));
-    localStorage.setItem('events_partyPdf', JSON.stringify(partyPdf));
-    localStorage.setItem('events_waiverPdf', JSON.stringify(waiverPdf));
-  }, [imageUrls, dayCampPdf, partyPdf, waiverPdf]);
+  const handleImageUpload = async (event) => {
+    if (!isAdmin) {
+      alert('Only admins can upload images.');
+      return;
+    }
 
-  const handleImageUpload = (url) => {
-    setImageUrls((prev) => {
-      const updated = [...prev, url].slice(-4); // Limit to last 4 images
-      console.log('Updated Image URLs state:', updated);
-      return updated;
-    });
+    const files = event.target.files;
+    if (!files.length) return;
+
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append('image', file));
+
+    try {
+      const uploadResponse = await fetchWithToken(
+        process.env.NODE_ENV === 'production'
+          ? 'https://your-heroku-app.herokuapp.com/api/images'
+          : 'http://localhost:5000/api/images',
+        {
+          method: 'POST',
+          body: formData,
+          headers: { 'Page': 'events' },
+        }
+      );
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`Failed to upload image: ${errorText}`);
+      }
+      const uploadData = await uploadResponse.json();
+      console.log('Upload response:', uploadData);
+
+      // Re-fetch updated images
+      const updatedResponse = await fetch(
+        process.env.NODE_ENV === 'production'
+          ? 'https://your-heroku-app.herokuapp.com/api/images?page=events'
+          : 'http://localhost:5000/api/images?page=events'
+      );
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        console.log('Updated images data:', updatedData);
+        setImageUrls(updatedData.images || []);
+      }
+
+      alert('Images uploaded successfully!');
+    } catch (err) {
+      console.error('Error uploading images:', err);
+      alert('Failed to upload images: ' + err.message);
+    }
+  };
+
+  const handleImageDelete = async (urlToRemove) => {
+    if (!isAdmin) {
+      alert('Only admins can delete images.');
+      return;
+    }
+
+    try {
+      const deleteResponse = await fetchWithToken(
+        process.env.NODE_ENV === 'production'
+          ? 'https://your-heroku-app.herokuapp.com/api/images'
+          : 'http://localhost:5000/api/images',
+        {
+          method: 'DELETE',
+          headers: { 'Page': 'events', 'Url': urlToRemove },
+        }
+      );
+
+      if (!deleteResponse.ok) {
+        const errorText = await deleteResponse.text();
+        throw new Error(`Failed to delete image: ${errorText}`);
+      }
+
+      // Re-fetch after deletion
+      const updatedResponse = await fetch(
+        process.env.NODE_ENV === 'production'
+          ? 'https://your-heroku-app.herokuapp.com/api/images?page=events'
+          : 'http://localhost:5000/api/images?page=events'
+      );
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        console.log('Updated images data after delete:', updatedData);
+        setImageUrls(updatedData.images || []);
+      }
+
+      alert('Image deleted successfully!');
+    } catch (err) {
+      console.error('Error deleting image:', err);
+      alert('Failed to delete image: ' + err.message);
+    }
+  };
+
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  const openModal = (url) => {
+    setSelectedImage(url);
+  };
+
+  const closeModal = () => {
+    setSelectedImage(null);
   };
 
   const handlePdfUpload = (url, section) => {
@@ -76,18 +156,21 @@ function Events() {
     if (section === 'dayCamp') {
       setDayCampPdf((prev) => {
         const updated = [...prev, url];
+        localStorage.setItem('events_dayCampPdf', JSON.stringify(updated));
         console.log('Updated Day Camp PDF state:', updated);
         return updated;
       });
     } else if (section === 'party') {
       setPartyPdf((prev) => {
         const updated = [...prev, url];
+        localStorage.setItem('events_partyPdf', JSON.stringify(updated));
         console.log('Updated Party PDF state:', updated);
         return updated;
       });
     } else if (section === 'waiver') {
       setWaiverPdf((prev) => {
         const updated = [...prev, url];
+        localStorage.setItem('events_waiverPdf', JSON.stringify(updated));
         console.log('Updated Waiver PDF state:', updated);
         return updated;
       });
@@ -114,18 +197,21 @@ function Events() {
       if (section === 'dayCamp') {
         setDayCampPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
+          localStorage.setItem('events_dayCampPdf', JSON.stringify(updated));
           console.log('Updated Day Camp PDF state after removal:', updated);
           return updated;
         });
       } else if (section === 'party') {
         setPartyPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
+          localStorage.setItem('events_partyPdf', JSON.stringify(updated));
           console.log('Updated Party PDF state after removal:', updated);
           return updated;
         });
       } else if (section === 'waiver') {
         setWaiverPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
+          localStorage.setItem('events_waiverPdf', JSON.stringify(updated));
           console.log('Updated Waiver PDF state after removal:', updated);
           return updated;
         });
@@ -172,10 +258,35 @@ function Events() {
           </div>
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h3 className="text-2xl font-semibold text-teal-600 mb-4">Gallery</h3>
-            <ImageUpload onUpload={handleImageUpload} page="events" />
+            {isAdmin && (
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="border p-2 rounded mb-4"
+                />
+              </div>
+            )}
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
               {imageUrls.map((url, index) => (
-                <img key={index} src={url} alt={`Event ${index + 1}`} className="w-full h-48 object-cover rounded-lg" />
+                <div key={index} className="relative">
+                  <img
+                    src={url}
+                    alt={`Event ${index + 1}`}
+                    className="w-full h-48 object-cover rounded-lg cursor-pointer"
+                    onClick={() => openModal(url)}
+                  />
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleImageDelete(url)}
+                      className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded"
+                    >
+                      X
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -194,6 +305,21 @@ function Events() {
           </div>
         </div>
       </div>
+
+      {/* Modal for larger image view */}
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={closeModal}>
+          <div className="relative">
+            <img src={selectedImage} alt="Enlarged" className="max-h-[90vh] max-w-[90vw]" />
+            <button
+              onClick={closeModal}
+              className="absolute top-2 right-2 text-white bg-red-600 p-2 rounded"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

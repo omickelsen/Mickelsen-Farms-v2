@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
 
 const EditableSection = ({ page, initialContent, field }) => {
@@ -6,18 +6,46 @@ const EditableSection = ({ page, initialContent, field }) => {
   const [content, setContent] = useState(initialContent);
   const [isEditing, setIsEditing] = useState(false);
 
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        const response = await fetch(
+          process.env.NODE_ENV === 'production'
+            ? `https://your-heroku-app.herokuapp.com/api/content/${page}`
+            : `http://localhost:5000/api/content/${page}`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setContent(data.content[field] || initialContent); // Use server data or fallback to initialContent
+          console.log(`Fetched content for ${page}.${field}:`, data.content[field]);
+        } else {
+          console.warn(`No content found for ${page}.${field}, using initialContent`);
+        }
+      } catch (err) {
+        console.error(`Error fetching content for ${page}:`, err);
+      }
+    };
+    fetchContent();
+  }, [page, field]); // Re-fetch if page or field changes
+
   const handleSave = async () => {
     try {
-      const response = await fetchWithToken(`http://localhost:5000/api/content/${page}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: content }),
-      });
+      const response = await fetchWithToken(
+        process.env.NODE_ENV === 'production'
+          ? `https://your-heroku-app.herokuapp.com/api/content/${page}`
+          : `http://localhost:5000/api/content/${page}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: content }),
+        }
+      );
       if (!response.ok) throw new Error('Failed to save content');
       setIsEditing(false);
       alert('Content saved successfully!');
     } catch (err) {
       console.error('Error saving content:', err);
+      alert('Failed to save content: ' + err.message);
     }
   };
 
