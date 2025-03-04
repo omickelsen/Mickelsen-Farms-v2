@@ -14,7 +14,7 @@ const ServicesSection = () => {
     },
     {
       title: 'Trail Rides',
-      description: 'Guided rides through scenic farm landscapes.',
+      description: 'Guided rides through scenic Mountain landscapes.',
       link: '/trail-rides',
     },
     {

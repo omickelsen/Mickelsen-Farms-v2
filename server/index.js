@@ -20,7 +20,7 @@ app.use(cors({
   origin: process.env.NODE_ENV === 'production' ? 'https://your-heroku-app.herokuapp.com' : 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Page', 'Url'], // Added 'Url' for DELETE
+  allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Page', 'Url'],
   optionsSuccessStatus: 200,
 }));
 
@@ -56,9 +56,11 @@ const authenticateToken = async (req, res, next) => {
   next();
 };
 
-// MongoDB schema for hero background image with multiple URLs
+// MongoDB schema for hero background
 const heroBackgroundSchema = new mongoose.Schema({
-  urls: [{ type: String, required: true }], // Array of image URLs
+  url: { type: String }, // Single image URL for backward compatibility
+  urls: [{ type: String }], // Array of image URLs for carousel and pages
+  pdfs: [{ type: String }], // Array of PDF URLs
   page: { type: String, required: true },
 });
 const HeroBackground = mongoose.model('HeroBackground', heroBackgroundSchema, 'heroBackgrounds');
@@ -68,7 +70,23 @@ mongoose.connection.once('open', async () => {
   for (const page of pages) {
     const existing = await HeroBackground.findOne({ page });
     if (!existing) {
-      await HeroBackground.create({ urls: [`/path-to-${page}-image.jpg`], page });
+      await HeroBackground.create({
+        url: `/path-to-${page}-image.jpg`,
+        urls: [],
+        pdfs: [],
+        page,
+      });
+    } else if (!existing.urls || !existing.pdfs) {
+      await HeroBackground.findOneAndUpdate(
+        { page },
+        {
+          $set: {
+            urls: existing.url ? [existing.url] : [],
+            pdfs: existing.pdfs || [],
+          },
+        },
+        { new: true }
+      );
     }
   }
 });
@@ -85,7 +103,7 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname);
   },
 });
-const upload = multer({ storage: storage});
+const upload = multer({ storage: storage });
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -96,11 +114,13 @@ app.use('/api/images', (req, res, next) => {
   next();
 });
 app.use('/api/hero-background', authenticateToken);
+app.use('/api/pdfs', authenticateToken);
 
 app.use('/auth', authRouter);
 app.use('/api/calendar', calendarRouter);
 app.use('/api/content', contentRouter);
 
+// Image endpoints
 app.post('/api/images', authenticateToken, upload.single('image'), async (req, res) => {
   if (!req.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
@@ -119,32 +139,22 @@ app.post('/api/images', authenticateToken, upload.single('image'), async (req, r
       { new: true }
     );
   } else {
-    await HeroBackground.create({ urls: [url], page });
+    await HeroBackground.create({ url: '', urls: [url], pdfs: [], page });
   }
-  console.log('Uploaded image URL:', url); // Debug log
+  console.log('Uploaded image URL:', url);
   res.json({ url });
 });
 
 app.get('/api/images', async (req, res) => {
   const page = req.query.page || 'default';
-  const uploadDir = path.join(__dirname, 'uploads');
-  fs.readdir(uploadDir, (err, files) => {
-    if (err) {
-      console.error('Error reading uploads directory:', err);
-      return res.status(500).json({ error: 'Failed to read images' });
-    }
-    HeroBackground.findOne({ page })
-      .then((doc) => {
-        if (!doc) {
-          return res.json({ images: [] });
-        }
-        res.json({ images: doc.urls });
-      })
-      .catch((err) => {
-        console.error('Error querying HeroBackground:', err);
-        res.status(500).json({ error: 'Failed to fetch images' });
-      });
-  });
+  try {
+    const background = await HeroBackground.findOne({ page });
+    const images = background ? (background.urls.length > 0 ? background.urls : [background.url || '']) : [];
+    res.json({ images });
+  } catch (err) {
+    console.error('Error querying HeroBackground:', err);
+    res.status(500).json({ error: 'Failed to fetch images' });
+  }
 });
 
 app.delete('/api/images', authenticateToken, async (req, res) => {
@@ -176,10 +186,77 @@ app.delete('/api/images', authenticateToken, async (req, res) => {
   }
 });
 
+// PDF endpoints
+app.post('/api/pdfs', authenticateToken, upload.single('pdf'), async (req, res) => {
+  if (!req.isAdmin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  if (!req.file || !req.file.filename || !req.file.mimetype.startsWith('application/pdf')) {
+    return res.status(400).json({ error: 'No valid PDF provided' });
+  }
+  const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  const page = req.headers['page'] || 'default';
+
+  const background = await HeroBackground.findOne({ page });
+  if (background) {
+    await HeroBackground.findOneAndUpdate(
+      { page },
+      { $push: { pdfs: url } },
+      { new: true }
+    );
+  } else {
+    await HeroBackground.create({ url: '', urls: [], pdfs: [url], page });
+  }
+  console.log('Uploaded PDF URL:', url);
+  res.json({ url });
+});
+
+app.get('/api/pdfs', async (req, res) => {
+  const page = req.query.page || 'default';
+  try {
+    const background = await HeroBackground.findOne({ page });
+    const pdfs = background ? background.pdfs : [];
+    res.json({ pdfs });
+  } catch (err) {
+    console.error('Error querying HeroBackground for PDFs:', err);
+    res.status(500).json({ error: 'Failed to fetch PDFs' });
+  }
+});
+
+app.delete('/api/pdfs', authenticateToken, async (req, res) => {
+  if (!req.isAdmin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  const page = req.headers['page'] || 'default';
+  const urlToRemove = req.headers['url'];
+
+  if (!urlToRemove) {
+    return res.status(400).json({ error: 'URL to remove is required' });
+  }
+
+  try {
+    const background = await HeroBackground.findOne({ page });
+    if (background && background.pdfs.includes(urlToRemove)) {
+      await HeroBackground.findOneAndUpdate(
+        { page },
+        { $pull: { pdfs: urlToRemove } },
+        { new: true }
+      );
+      res.json({ message: 'PDF removed successfully' });
+    } else {
+      res.status(404).json({ error: 'PDF not found' });
+    }
+  } catch (err) {
+    console.error('Error removing PDF:', err);
+    res.status(500).json({ error: 'Failed to remove PDF' });
+  }
+});
+
 app.get('/api/hero-background', async (req, res) => {
   try {
     const background = await HeroBackground.findOne({ page: 'default' });
-    res.json({ url: background ? background.urls[0] : '/path-to-farm-image.jpg' });
+    const url = background ? (background.urls[0] || background.url || '/path-to-farm-image.jpg') : '/path-to-farm-image.jpg';
+    res.json({ url });
   } catch (err) {
     console.error('Error fetching hero background:', err);
     res.status(500).json({ error: 'Failed to fetch hero background' });
@@ -195,7 +272,7 @@ app.post('/api/hero-background', async (req, res) => {
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
     }
-    await HeroBackground.findOneAndUpdate({ page: 'default' }, { $set: { urls: [url] } }, { upsert: true, new: true });
+    await HeroBackground.findOneAndUpdate({ page: 'default' }, { $set: { urls: [url], url: url } }, { upsert: true, new: true });
     res.json({ url });
   } catch (err) {
     console.error('Error updating hero background:', err);
