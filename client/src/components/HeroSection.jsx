@@ -5,6 +5,7 @@ const HeroSection = () => {
   const { token, isAdmin } = useAuth();
   const [backgroundImage, setBackgroundImage] = useState('/path-to-farm-image.jpg');
   const [isUploading, setIsUploading] = useState(false);
+  const [images, setImages] = useState([]); // Store all images for delete option
 
   useEffect(() => {
     const fetchHeroBackground = async () => {
@@ -16,8 +17,11 @@ const HeroSection = () => {
         );
         if (response.ok) {
           const data = await response.json();
-          console.log('Hero fetched images data:', data); // Debugging
+          console.log('Hero fetched images data:', data);
+          setImages(data.images || []);
           setBackgroundImage(data.images[0] || '/path-to-farm-image.jpg');
+        } else {
+          console.error('Fetch failed with status:', response.status);
         }
       } catch (err) {
         console.error('Error fetching hero background:', err);
@@ -51,17 +55,75 @@ const HeroSection = () => {
         }
       );
 
-      if (!uploadResponse.ok) throw new Error('Failed to upload image');
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`Failed to upload image: ${errorText}`);
+      }
       const uploadData = await uploadResponse.json();
-      const newImageUrl = uploadData.url;
+      console.log('Upload response:', uploadData);
 
-      setBackgroundImage(newImageUrl);
+      // Re-fetch the updated background image
+      const updatedResponse = await fetch(
+        process.env.NODE_ENV === 'production'
+          ? 'https://your-heroku-app.herokuapp.com/api/images?page=default'
+          : 'http://localhost:5000/api/images?page=default'
+      );
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        console.log('Updated images data:', updatedData);
+        setImages(updatedData.images || []);
+        setBackgroundImage(updatedData.images[0] || uploadData.url || '/path-to-farm-image.jpg');
+      } else {
+        console.error('Update fetch failed with status:', updatedResponse.status);
+      }
+
       alert('Background image updated successfully!');
     } catch (err) {
       console.error('Error updating hero background:', err);
-      alert('Failed to update background image.');
+      alert('Failed to update background image: ' + err.message);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleImageDelete = async (urlToRemove) => {
+    if (!isAdmin || !token) {
+      alert('Only admins can delete images.');
+      return;
+    }
+
+    try {
+      const deleteResponse = await fetchWithToken(
+        process.env.NODE_ENV === 'production'
+          ? 'https://your-heroku-app.herokuapp.com/api/images'
+          : 'http://localhost:5000/api/images',
+        {
+          method: 'DELETE',
+          headers: { 'Page': 'default', 'Url': urlToRemove },
+        }
+      );
+
+      if (!deleteResponse.ok) {
+        const errorText = await deleteResponse.text();
+        throw new Error(`Failed to delete image: ${errorText}`);
+      }
+
+      // Re-fetch after deletion
+      const updatedResponse = await fetch(
+        process.env.NODE_ENV === 'production'
+          ? 'https://your-heroku-app.herokuapp.com/api/images?page=default'
+          : 'http://localhost:5000/api/images?page=default'
+      );
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        console.log('Updated images data after delete:', updatedData);
+        setImages(updatedData.images || []);
+        setBackgroundImage(updatedData.images[0] || '/path-to-farm-image.jpg');
+      }
+      alert('Image deleted successfully!');
+    } catch (err) {
+      console.error('Error deleting image:', err);
+      alert('Failed to delete image: ' + err.message);
     }
   };
 
@@ -87,6 +149,19 @@ const HeroSection = () => {
             className="btn-primary p-2 rounded"
           />
           {isUploading && <span className="ml-2 text-white">Uploading...</span>}
+          {images.length > 0 && (
+            <div className="mt-2">
+              {images.map((url, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleImageDelete(url)}
+                  className="ml-2 bg-red-600 text-white p-1 rounded"
+                >
+                  Delete {index + 1}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>

@@ -130,19 +130,30 @@ app.post('/api/images', authenticateToken, upload.single('image'), async (req, r
   }
   const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
   const page = req.headers['page'] || 'default';
+  console.log(`Uploading image for page: ${page}, URL: ${url}`); // Debug log
 
-  const background = await HeroBackground.findOne({ page });
-  if (background) {
-    await HeroBackground.findOneAndUpdate(
-      { page },
-      { $push: { urls: url } },
-      { new: true }
-    );
-  } else {
-    await HeroBackground.create({ url: '', urls: [url], pdfs: [], page });
+  try {
+    const background = await HeroBackground.findOne({ page });
+    if (background) {
+      const updatedBackground = await HeroBackground.findOneAndUpdate(
+        { page },
+        { 
+          $push: { urls: url }, 
+          $set: { url: url } // Update the single url field
+        },
+        { new: true, runValidators: true }
+      );
+      console.log('Updated HeroBackground:', updatedBackground); // Debug updated document
+    } else {
+      await HeroBackground.create({ url: url, urls: [url], pdfs: [], page });
+      console.log('Created new HeroBackground for page:', page);
+    }
+    console.log('Uploaded image URL:', url);
+    res.json({ url });
+  } catch (err) {
+    console.error('Error updating HeroBackground:', err);
+    res.status(500).json({ error: 'Failed to upload image: ' + err.message });
   }
-  console.log('Uploaded image URL:', url);
-  res.json({ url });
 });
 
 app.get('/api/images', async (req, res) => {
@@ -150,6 +161,7 @@ app.get('/api/images', async (req, res) => {
   try {
     const background = await HeroBackground.findOne({ page });
     const images = background ? (background.urls.length > 0 ? background.urls : [background.url || '']) : [];
+    console.log(`Fetched images for page ${page}:`, images); // Debug log
     res.json({ images });
   } catch (err) {
     console.error('Error querying HeroBackground:', err);
@@ -256,6 +268,7 @@ app.get('/api/hero-background', async (req, res) => {
   try {
     const background = await HeroBackground.findOne({ page: 'default' });
     const url = background ? (background.urls[0] || background.url || '/path-to-farm-image.jpg') : '/path-to-farm-image.jpg';
+    console.log('Hero background URL:', url); // Debug log
     res.json({ url });
   } catch (err) {
     console.error('Error fetching hero background:', err);
