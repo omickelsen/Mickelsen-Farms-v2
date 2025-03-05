@@ -16,11 +16,15 @@ function HorseLessons() {
   const [imageUrls, setImageUrls] = useState([]);
   const [ridingLevelsPdf, setRidingLevelsPdf] = useState(() => {
     const saved = localStorage.getItem('ridingLevelsPdf');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved).map(url => 
+      process.env.NODE_ENV === 'development' ? url : url.replace(/^http:\/\/localhost:5000/, '')
+    ) : [];
   });
   const [registrationPdf, setRegistrationPdf] = useState(() => {
     const saved = localStorage.getItem('registrationPdf');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved).map(url => 
+      process.env.NODE_ENV === 'development' ? url : url.replace(/^http:\/\/localhost:5000/, '')
+    ) : [];
   });
 
   useEffect(() => {
@@ -43,9 +47,7 @@ function HorseLessons() {
   }, []);
 
   const handleImageUpload = async (event) => {
-    if (!isAdmin) {
-      return;
-    }
+    if (!isAdmin) return;
 
     const files = event.target.files;
     if (!files.length) return;
@@ -65,11 +67,13 @@ function HorseLessons() {
         throw new Error(`Failed to upload image: ${errorText}`);
       }
       const uploadData = await uploadResponse.json();
+      const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+      const cleanUrl = uploadData.url.startsWith('http') ? uploadData.url.replace(/^http:\/\/localhost:5000/, '') : uploadData.url;
+      const fullUrl = `${baseUrl}${cleanUrl}`;
 
       const updatedResponse = await fetch('/api/images?page=horse-lessons');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
         const fullUrls = updatedData.images.map(url => {
           return url.startsWith('http') ? url : (process.env.NODE_ENV === 'development' ? `${baseUrl}${url}` : url);
         });
@@ -81,14 +85,12 @@ function HorseLessons() {
   };
 
   const handleImageDelete = async (urlToRemove) => {
-    if (!isAdmin) {
-      return;
-    }
+    if (!isAdmin) return;
 
     try {
       const deleteResponse = await fetchWithToken('/api/images', {
         method: 'DELETE',
-        headers: { 'Page': 'horse-lessons', 'Url': urlToRemove },
+        headers: { 'Page': 'horse-lessons', 'Url': urlToRemove.replace(/^http:\/\/localhost:5000/, '') },
       });
 
       if (!deleteResponse.ok) {
@@ -121,9 +123,7 @@ function HorseLessons() {
   };
 
   const handlePdfUpload = (url, section) => {
-    if (!isAdmin) {
-      return;
-    }
+    if (!isAdmin) return;
 
     const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
     const cleanUrl = url.startsWith('http') ? url.replace(/^http:\/\/localhost:5000/, '') : url;
@@ -132,38 +132,45 @@ function HorseLessons() {
     if (section === 'ridingLevels') {
       setRidingLevelsPdf((prev) => {
         const updated = [...prev, fullUrl];
-        localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated));
+        localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated.map(u => 
+          process.env.NODE_ENV === 'development' ? u : u.replace(/^http:\/\/localhost:5000/, '')
+        )));
         return updated;
       });
     } else if (section === 'registration') {
       setRegistrationPdf((prev) => {
         const updated = [...prev, fullUrl];
-        localStorage.setItem('registrationPdf', JSON.stringify(updated));
+        localStorage.setItem('registrationPdf', JSON.stringify(updated.map(u => 
+          process.env.NODE_ENV === 'development' ? u : u.replace(/^http:\/\/localhost:5000/, '')
+        )));
         return updated;
       });
     }
   };
 
   const handlePdfRemove = async (urlToRemove, section) => {
-    if (!isAdmin) {
-      return;
-    }
+    if (!isAdmin) return;
 
+    const cleanUrl = urlToRemove.replace(/^http:\/\/localhost:5000/, '');
     const response = await fetchWithToken('/api/pdfs', {
       method: 'DELETE',
-      headers: { 'Page': 'horse-lessons', 'Url': urlToRemove },
+      headers: { 'Page': 'horse-lessons', 'Url': cleanUrl },
     });
     if (response.ok) {
       if (section === 'ridingLevels') {
         setRidingLevelsPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
-          localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated));
+          localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated.map(u => 
+            process.env.NODE_ENV === 'development' ? u : u.replace(/^http:\/\/localhost:5000/, '')
+          )));
           return updated;
         });
       } else if (section === 'registration') {
         setRegistrationPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
-          localStorage.setItem('registrationPdf', JSON.stringify(updated));
+          localStorage.setItem('registrationPdf', JSON.stringify(updated.map(u => 
+            process.env.NODE_ENV === 'development' ? u : u.replace(/^http:\/\/localhost:5000/, '')
+          )));
           return updated;
         });
       }
