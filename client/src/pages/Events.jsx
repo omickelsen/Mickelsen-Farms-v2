@@ -9,13 +9,13 @@ const getFilenameFromUrl = (url) => {
   return parts.slice(1).join('-');
 };
 
-// Map filenames to sections (secondary check)
+// Map filenames to sections (optional secondary check, not primary)
 const categorizePdf = (url) => {
   const filename = getFilenameFromUrl(url).toLowerCase();
   if (filename.includes('day-camp') || filename.includes('camp')) return 'dayCamp';
   if (filename.includes('party')) return 'party';
   if (filename.includes('waiver') || filename.includes('liability')) return 'waiver';
-  return null; // No default, rely on section parameter
+  return null; // Rely on upload section, not filename
 };
 
 function Events() {
@@ -24,6 +24,7 @@ function Events() {
   const [dayCampPdf, setDayCampPdf] = useState([]);
   const [partyPdf, setPartyPdf] = useState([]);
   const [waiverPdf, setWaiverPdf] = useState([]);
+  const [pdfSectionMap, setPdfSectionMap] = useState({}); // Map URL to original section
 
   useEffect(() => {
     const fetchData = async () => {
@@ -36,27 +37,25 @@ function Events() {
         if (!pdfResponse.ok) throw new Error('Failed to fetch PDFs');
         const pdfData = await pdfResponse.json();
         const validPdfs = pdfData.pdfs.filter(url => url.endsWith('.pdf'));
-        const categorizedPdfs = validPdfs.reduce((acc, url) => {
-          // Initial categorization based on fetch (no section context)
-          const filenameCategory = categorizePdf(url);
-          if (filenameCategory) {
-            if (filenameCategory === 'dayCamp') acc.dayCamp.push(url);
-            else if (filenameCategory === 'party') acc.party.push(url);
-            else if (filenameCategory === 'waiver') acc.waiver.push(url);
-          } else {
-            // Fallback to a neutral state (will be corrected by upload section)
-            acc.uncategorized.push(url);
-          }
-          return acc;
-        }, { dayCamp: [], party: [], waiver: [], uncategorized: [] });
 
-        // Initial state based on filename categorization
-        setDayCampPdf(categorizedPdfs.dayCamp);
-        setPartyPdf(categorizedPdfs.party);
-        setWaiverPdf(categorizedPdfs.waiver);
-        localStorage.setItem('events_dayCampPdf', JSON.stringify(categorizedPdfs.dayCamp));
-        localStorage.setItem('events_partyPdf', JSON.stringify(categorizedPdfs.party));
-        localStorage.setItem('events_waiverPdf', JSON.stringify(categorizedPdfs.waiver));
+        // Initialize states based on existing PDFs (no section context yet)
+        const initialDayCamp = [];
+        const initialParty = [];
+        const initialWaiver = [];
+        validPdfs.forEach(url => {
+          // Fallback to filename categorization if no prior map
+          const section = pdfSectionMap[url] || categorizePdf(url) || 'dayCamp'; // Default to dayCamp if unknown
+          if (section === 'dayCamp') initialDayCamp.push(url);
+          else if (section === 'party') initialParty.push(url);
+          else if (section === 'waiver') initialWaiver.push(url);
+        });
+
+        setDayCampPdf(initialDayCamp);
+        setPartyPdf(initialParty);
+        setWaiverPdf(initialWaiver);
+        localStorage.setItem('events_dayCampPdf', JSON.stringify(initialDayCamp));
+        localStorage.setItem('events_partyPdf', JSON.stringify(initialParty));
+        localStorage.setItem('events_waiverPdf', JSON.stringify(initialWaiver));
       } catch (err) {
         console.error('Fetch error:', err);
         const savedDayCamp = localStorage.getItem('events_dayCampPdf');
@@ -68,7 +67,7 @@ function Events() {
       }
     };
     fetchData();
-  }, []);
+  }, [pdfSectionMap]); // Re-run if pdfSectionMap changes
 
   const handleImageUpload = async (event) => {
     if (!isAdmin) return;
@@ -113,20 +112,21 @@ function Events() {
 
   const handlePdfUpload = async (url, section) => {
     if (!isAdmin) return;
+    if (!['dayCamp', 'party', 'waiver'].includes(section)) {
+      console.warn(`Invalid section: ${section}, defaulting to dayCamp`);
+      section = 'dayCamp';
+    }
+    // Update the section map for the new PDF
+    setPdfSectionMap(prev => ({ ...prev, [url]: section }));
     const updatedResponse = await fetch('/api/pdfs?page=events');
     if (updatedResponse.ok) {
       const updatedData = await updatedResponse.json();
       const validPdfs = updatedData.pdfs.filter(url => url.endsWith('.pdf'));
       const categorizedPdfs = validPdfs.reduce((acc, url) => {
-        // Primary categorization based on upload section
-        let category = section; // Use the section from the upload
-        const filenameCategory = categorizePdf(url);
-        if (filenameCategory && !['dayCamp', 'party', 'waiver'].includes(category)) {
-          category = filenameCategory; // Override with filename if section is invalid
-        }
-        if (category === 'dayCamp') acc.dayCamp.push(url);
-        else if (category === 'party') acc.party.push(url);
-        else if (category === 'waiver') acc.waiver.push(url);
+        const originalSection = pdfSectionMap[url] || categorizePdf(url) || section; // Use original section or fallback
+        if (originalSection === 'dayCamp') acc.dayCamp.push(url);
+        else if (originalSection === 'party') acc.party.push(url);
+        else if (originalSection === 'waiver') acc.waiver.push(url);
         return acc;
       }, { dayCamp: [], party: [], waiver: [] });
       setDayCampPdf(categorizedPdfs.dayCamp);
@@ -140,6 +140,16 @@ function Events() {
 
   const handlePdfRemove = async (urlToRemove, section) => {
     if (!isAdmin) return;
+    if (!['dayCamp', 'party', 'waiver'].includes(section)) {
+      console.warn(`Invalid section: ${section}, defaulting to dayCamp`);
+      section = 'dayCamp';
+    }
+    // Remove the URL from the section map
+    setPdfSectionMap(prev => {
+      const newMap = { ...prev };
+      delete newMap[urlToRemove];
+      return newMap;
+    });
     try {
       const response = await fetchWithToken('/api/pdfs', {
         method: 'DELETE',
@@ -153,15 +163,10 @@ function Events() {
         const updatedData = await updatedResponse.json();
         const validPdfs = updatedData.pdfs.filter(url => url.endsWith('.pdf'));
         const categorizedPdfs = validPdfs.reduce((acc, url) => {
-          // Recategorize based on original upload section (not re-evaluated here)
-          let category = section; // Use the section from the remove action
-          const filenameCategory = categorizePdf(url);
-          if (filenameCategory && !['dayCamp', 'party', 'waiver'].includes(category)) {
-            category = filenameCategory; // Fallback to filename if section is invalid
-          }
-          if (category === 'dayCamp') acc.dayCamp.push(url);
-          else if (category === 'party') acc.party.push(url);
-          else if (category === 'waiver') acc.waiver.push(url);
+          const originalSection = pdfSectionMap[url] || categorizePdf(url) || section; // Use original section or fallback
+          if (originalSection === 'dayCamp') acc.dayCamp.push(url);
+          else if (originalSection === 'party') acc.party.push(url);
+          else if (originalSection === 'waiver') acc.waiver.push(url);
           return acc;
         }, { dayCamp: [], party: [], waiver: [] });
         setDayCampPdf(categorizedPdfs.dayCamp);
