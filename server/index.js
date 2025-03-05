@@ -315,12 +315,12 @@ app.post('/api/hero-background', async (req, res) => {
 
 // Serve React build in production, excluding API routes
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client')));
+  app.use(express.static(path.join(__dirname, '../client/dist')));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) {
       next(); // Pass to API routes
     } else {
-      res.sendFile(path.join(__dirname, '../client', 'index.html'));
+      res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
     }
   });
 }
