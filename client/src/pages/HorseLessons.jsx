@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import EditableSection from '../components/EditableSection';
-import ImageUpload from '../components/ImageUpload';
 import PdfUpload from '../components/PdfUpload';
 import PdfDownload from '../components/PdfDownload';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
 
-// Function to extract the original filename from URL, removing the timestamp prefix
 const getFilenameFromUrl = (url) => {
   const parts = url.substring(url.lastIndexOf('/') + 1).split('-');
   return parts.slice(1).join('-');
@@ -14,36 +12,32 @@ const getFilenameFromUrl = (url) => {
 function HorseLessons() {
   const { isAdmin, token } = useAuth();
   const [imageUrls, setImageUrls] = useState([]);
-  const [ridingLevelsPdf, setRidingLevelsPdf] = useState(() => {
-    const saved = localStorage.getItem('ridingLevelsPdf');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [registrationPdf, setRegistrationPdf] = useState(() => {
-    const saved = localStorage.getItem('registrationPdf');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [ridingLevelsPdf, setRidingLevelsPdf] = useState([]);
+  const [registrationPdf, setRegistrationPdf] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const cacheBuster = new Date().getTime();
-        const response = await fetch(`/api/images?page=horse-lessons&t=${cacheBuster}`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        setImageUrls(data.images || []);
-        // Sync with backend to remove phantoms
-        const savedImages = localStorage.getItem('imageUrls');
-        if (savedImages) {
-          const savedUrls = JSON.parse(savedImages);
-          const validUrls = data.images.filter(url => savedUrls.includes(url));
-          if (validUrls.length !== savedUrls.length) {
-            localStorage.setItem('imageUrls', JSON.stringify(data.images));
-          }
-        } else {
-          localStorage.setItem('imageUrls', JSON.stringify(data.images));
-        }
+        const imageResponse = await fetch(`/api/images?page=horse-lessons&t=${cacheBuster}`);
+        if (!imageResponse.ok) throw new Error('Failed to fetch images');
+        const imageData = await imageResponse.json();
+        setImageUrls(imageData.images || []);
+
+        const pdfResponse = await fetch(`/api/pdfs?page=horse-lessons&t=${cacheBuster}`);
+        if (!pdfResponse.ok) throw new Error('Failed to fetch PDFs');
+        const pdfData = await pdfResponse.json();
+        const validPdfs = pdfData.pdfs.filter(url => url.endsWith('.pdf')); // Filter out non-PDFs
+        setRidingLevelsPdf(validPdfs.filter(url => url.includes('riding-levels')) || []);
+        setRegistrationPdf(validPdfs.filter(url => !url.includes('riding-levels')) || []);
+        localStorage.setItem('ridingLevelsPdf', JSON.stringify(validPdfs.filter(url => url.includes('riding-levels')) || []));
+        localStorage.setItem('registrationPdf', JSON.stringify(validPdfs.filter(url => !url.includes('riding-levels')) || []));
       } catch (err) {
-        // Error handled silently in production
+        console.error('Fetch error:', err);
+        const savedRidingLevels = localStorage.getItem('ridingLevelsPdf');
+        const savedRegistration = localStorage.getItem('registrationPdf');
+        if (savedRidingLevels) setRidingLevelsPdf(JSON.parse(savedRidingLevels));
+        if (savedRegistration) setRegistrationPdf(JSON.parse(savedRegistration));
       }
     };
     fetchData();
@@ -51,26 +45,17 @@ function HorseLessons() {
 
   const handleImageUpload = async (event) => {
     if (!isAdmin) return;
-
     const files = event.target.files;
     if (!files.length) return;
-
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append('image', file));
-
     try {
       const uploadResponse = await fetchWithToken('/api/images', {
         method: 'POST',
         body: formData,
         headers: { 'Page': 'horse-lessons' },
       });
-
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        throw new Error(`Failed to upload image: ${errorText}`);
-      }
-      const uploadData = await uploadResponse.json();
-
+      if (!uploadResponse.ok) throw new Error('Image upload failed');
       const updatedResponse = await fetch('/api/images?page=horse-lessons');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
@@ -78,25 +63,18 @@ function HorseLessons() {
         localStorage.setItem('imageUrls', JSON.stringify(updatedData.images));
       }
     } catch (err) {
-      // Error handled silently in production
+      console.error(err);
     }
   };
 
   const handleImageDelete = async (urlToRemove) => {
     if (!isAdmin) return;
-
     try {
       const deleteResponse = await fetchWithToken('/api/images', {
         method: 'DELETE',
         headers: { 'Page': 'horse-lessons', 'Url': urlToRemove },
       });
-
-      if (!deleteResponse.ok) {
-        const errorText = await deleteResponse.text();
-        throw new Error(`Failed to delete image: ${errorText}`);
-      }
-
-      // Fetch updated list to sync state
+      if (!deleteResponse.ok) throw new Error('Image delete failed');
       const updatedResponse = await fetch('/api/images?page=horse-lessons');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
@@ -104,61 +82,56 @@ function HorseLessons() {
         localStorage.setItem('imageUrls', JSON.stringify(updatedData.images));
       }
     } catch (err) {
-      // Error handled silently in production
+      console.error(err);
     }
   };
 
-  const [selectedImage, setSelectedImage] = useState(null);
-
-  const openModal = (url) => {
-    setSelectedImage(url);
-  };
-
-  const closeModal = () => {
-    setSelectedImage(null);
-  };
-
-  const handlePdfUpload = (url, section) => {
+  const handlePdfUpload = async (url, section) => {
     if (!isAdmin) return;
-
-    if (section === 'ridingLevels') {
-      setRidingLevelsPdf((prev) => {
-        const updated = [...prev, url];
-        localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated));
-        return updated;
-      });
-    } else if (section === 'registration') {
-      setRegistrationPdf((prev) => {
-        const updated = [...prev, url];
-        localStorage.setItem('registrationPdf', JSON.stringify(updated));
-        return updated;
-      });
+    const updatedResponse = await fetch('/api/pdfs?page=horse-lessons');
+    if (updatedResponse.ok) {
+      const updatedData = await updatedResponse.json();
+      const validPdfs = updatedData.pdfs.filter(url => url.endsWith('.pdf'));
+      if (section === 'ridingLevels') {
+        setRidingLevelsPdf(validPdfs.filter(url => url.includes('riding-levels')) || []);
+        localStorage.setItem('ridingLevelsPdf', JSON.stringify(validPdfs.filter(url => url.includes('riding-levels')) || []));
+      } else if (section === 'registration') {
+        setRegistrationPdf(validPdfs.filter(url => !url.includes('riding-levels')) || []);
+        localStorage.setItem('registrationPdf', JSON.stringify(validPdfs.filter(url => !url.includes('riding-levels')) || []));
+      }
     }
   };
 
   const handlePdfRemove = async (urlToRemove, section) => {
     if (!isAdmin) return;
-
-    const response = await fetchWithToken('/api/pdfs', {
-      method: 'DELETE',
-      headers: { 'Page': 'horse-lessons', 'Url': urlToRemove },
-    });
-    if (response.ok) {
-      if (section === 'ridingLevels') {
-        setRidingLevelsPdf((prev) => {
-          const updated = prev.filter((url) => url !== urlToRemove);
-          localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (section === 'registration') {
-        setRegistrationPdf((prev) => {
-          const updated = prev.filter((url) => url !== urlToRemove);
-          localStorage.setItem('registrationPdf', JSON.stringify(updated));
-          return updated;
-        });
+    try {
+      const response = await fetchWithToken('/api/pdfs', {
+        method: 'DELETE',
+        headers: { 'Page': 'horse-lessons', 'Url': urlToRemove },
+      });
+      if (!response.ok) {
+        console.warn(`DELETE failed for ${urlToRemove} with status ${response.status}`);
       }
+      const updatedResponse = await fetch('/api/pdfs?page=horse-lessons');
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        const validPdfs = updatedData.pdfs.filter(url => url.endsWith('.pdf'));
+        if (section === 'ridingLevels') {
+          setRidingLevelsPdf(validPdfs.filter(url => url.includes('riding-levels')) || []);
+          localStorage.setItem('ridingLevelsPdf', JSON.stringify(validPdfs.filter(url => url.includes('riding-levels')) || []));
+        } else if (section === 'registration') {
+          setRegistrationPdf(validPdfs.filter(url => !url.includes('riding-levels')) || []);
+          localStorage.setItem('registrationPdf', JSON.stringify(validPdfs.filter(url => !url.includes('riding-levels')) || []));
+        }
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
+
+  const [selectedImage, setSelectedImage] = useState(null);
+  const openModal = (url) => setSelectedImage(url);
+  const closeModal = () => setSelectedImage(null);
 
   return (
     <div className="py-16 bg-gray-50 min-h-screen">
@@ -232,15 +205,11 @@ function HorseLessons() {
           </div>
         </div>
       </div>
-
       {selectedImage && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={closeModal}>
           <div className="relative">
             <img src={selectedImage} alt="Enlarged" className="max-h-[90vh] max-w-[90vw]" />
-            <button
-              onClick={closeModal}
-              className="absolute top-2 right-2 text-white bg-red-600 p-2 rounded"
-            >
+            <button onClick={closeModal} className="absolute top-2 right-2 text-white bg-red-600 p-2 rounded">
               Close
             </button>
           </div>

@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import EditableSection from '../components/EditableSection';
-import ImageUpload from '../components/ImageUpload';
 import PdfUpload from '../components/PdfUpload';
 import PdfDownload from '../components/PdfDownload';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
 
-// Function to extract the original filename from URL, removing the timestamp prefix
 const getFilenameFromUrl = (url) => {
   const parts = url.substring(url.lastIndexOf('/') + 1).split('-');
   return parts.slice(1).join('-');
@@ -14,10 +12,7 @@ const getFilenameFromUrl = (url) => {
 function HorseBoarding() {
   const { isAdmin, token } = useAuth() || {};
   const [imageUrls, setImageUrls] = useState([]);
-  const [documentsPdf, setDocumentsPdf] = useState(() => {
-    const saved = localStorage.getItem('horseBoarding_documentsPdf');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [documentsPdf, setDocumentsPdf] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -27,118 +22,97 @@ function HorseBoarding() {
         setImageUrls(imageData.images || []);
 
         const pdfResponse = await fetch('/api/pdfs?page=horse-boarding');
-        if (pdfResponse.ok) {
-          const pdfData = await pdfResponse.json();
-          setDocumentsPdf(pdfData.pdfs || []);
-        }
+        if (!pdfResponse.ok) throw new Error('Failed to fetch PDFs');
+        const pdfData = await pdfResponse.json();
+        setDocumentsPdf(pdfData.pdfs || []);
+        localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(pdfData.pdfs || []));
       } catch (err) {
-        // Error handled silently in production
+        console.error('Fetch error:', err);
+        const savedPdfs = localStorage.getItem('horseBoarding_documentsPdf');
+        if (savedPdfs) setDocumentsPdf(JSON.parse(savedPdfs));
       }
     };
     fetchData();
   }, []);
 
   const handleImageUpload = async (event) => {
-    if (!isAdmin || !token) {
-      return;
-    }
-
+    if (!isAdmin || !token) return;
     const files = event.target.files;
     if (!files.length) return;
-
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append('image', file));
-
     try {
       const uploadResponse = await fetchWithToken('/api/images', {
         method: 'POST',
         body: formData,
         headers: { 'Page': 'horse-boarding' },
       });
-
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        throw new Error(`Failed to upload image: ${errorText}`);
-      }
-      const uploadData = await uploadResponse.json();
-
+      if (!uploadResponse.ok) throw new Error('Image upload failed');
       const updatedResponse = await fetch('/api/images?page=horse-boarding');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         setImageUrls(updatedData.images || []);
       }
     } catch (err) {
-      // Error handled silently in production
+      console.error(err);
     }
   };
 
   const handleImageDelete = async (urlToRemove) => {
-    if (!isAdmin || !token) {
-      return;
-    }
-
+    if (!isAdmin || !token) return;
     try {
       const deleteResponse = await fetchWithToken('/api/images', {
         method: 'DELETE',
         headers: { 'Page': 'horse-boarding', 'Url': urlToRemove },
       });
-
-      if (!deleteResponse.ok) {
-        const errorText = await deleteResponse.text();
-        throw new Error(`Failed to delete image: ${errorText}`);
-      }
-
+      if (!deleteResponse.ok) throw new Error('Image delete failed');
       const updatedResponse = await fetch('/api/images?page=horse-boarding');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         setImageUrls(updatedData.images || []);
       }
     } catch (err) {
-      // Error handled silently in production
+      console.error(err);
+    }
+  };
+
+  const handlePdfUpload = async (url) => {
+    if (!isAdmin) return;
+    setDocumentsPdf((prev) => {
+      const updated = [...prev, url];
+      localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updated));
+      return updated;
+    });
+    const updatedResponse = await fetch('/api/pdfs?page=horse-boarding');
+    if (updatedResponse.ok) {
+      const updatedData = await updatedResponse.json();
+      setDocumentsPdf(updatedData.pdfs || []);
+      localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updatedData.pdfs || []));
+    }
+  };
+
+  const handlePdfRemove = async (urlToRemove) => {
+    if (!isAdmin) return;
+    try {
+      const response = await fetchWithToken('/api/pdfs', {
+        method: 'DELETE',
+        headers: { 'Page': 'horse-boarding', 'Url': urlToRemove },
+      });
+      if (!response.ok) throw new Error('PDF delete failed');
+      const updatedResponse = await fetch('/api/pdfs?page=horse-boarding');
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        setDocumentsPdf(updatedData.pdfs || []);
+        localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updatedData.pdfs || []));
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const [selectedImage, setSelectedImage] = useState(null);
-
-  const openModal = (url) => {
-    setSelectedImage(url);
-  };
-
-  const closeModal = () => {
-    setSelectedImage(null);
-  };
-
-  const handlePdfUpload = (url, section) => {
-    if (!isAdmin) {
-      return;
-    }
-
-    if (section === 'documents') {
-      setDocumentsPdf((prev) => {
-        const updated = [...prev, url];
-        localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updated));
-        return updated;
-      });
-    }
-  };
-
-  const handlePdfRemove = async (urlToRemove, section) => {
-    if (!isAdmin) {
-      return;
-    }
-
-    const response = await fetchWithToken('/api/pdfs', {
-      method: 'DELETE',
-      headers: { 'Page': 'horse-boarding', 'Url': urlToRemove },
-    });
-    if (response.ok) {
-      setDocumentsPdf((prev) => {
-        const updated = prev.filter((url) => url !== urlToRemove);
-        localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updated));
-        return updated;
-      });
-    }
-  };
+  const openModal = (url) => setSelectedImage(url);
+  const closeModal = () => setSelectedImage(null);
 
   return (
     <div className="py-16 bg-gray-50 min-h-screen">
@@ -190,14 +164,14 @@ function HorseBoarding() {
                 </div>
               ))}
             </div>
-            {isAdmin && <PdfUpload onUpload={(url) => handlePdfUpload(url, 'documents')} page="horse-boarding" />}
+            {isAdmin && <PdfUpload onUpload={handlePdfUpload} page="horse-boarding" />}
             {documentsPdf.length > 0 && (
               <div className="mt-4">
                 <EditableSection page="horse-boarding" initialContent="Download our boarding documents:" field="pdf" />
                 {documentsPdf.map((url, index) => (
                   <div key={index} className="flex items-center justify-between mt-2">
                     <PdfDownload url={url} label={getFilenameFromUrl(url)} />
-                    {isAdmin && <button onClick={() => handlePdfRemove(url, 'documents')} className="text-red-500 ml-2">Remove</button>}
+                    {isAdmin && <button onClick={() => handlePdfRemove(url)} className="text-red-500 ml-2">Remove</button>}
                   </div>
                 ))}
               </div>
@@ -205,15 +179,11 @@ function HorseBoarding() {
           </div>
         </div>
       </div>
-
       {selectedImage && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={closeModal}>
           <div className="relative">
             <img src={selectedImage} alt="Enlarged" className="max-h-[90vh] max-w-[90vw]" />
-            <button
-              onClick={closeModal}
-              className="absolute top-2 right-2 text-white bg-red-600 p-2 rounded"
-            >
+            <button onClick={closeModal} className="absolute top-2 right-2 text-white bg-red-600 p-2 rounded">
               Close
             </button>
           </div>

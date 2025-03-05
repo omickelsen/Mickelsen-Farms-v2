@@ -3,34 +3,30 @@ import { useAuth, fetchWithToken } from '../context/AuthContext';
 
 const EditableSection = ({ page, initialContent, field }) => {
   const { token, isAdmin } = useAuth() || {};
-  const [content, setContent] = useState(initialContent);
+  const [content, setContent] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null); // State for error messages
-  const [success, setSuccess] = useState(null); // State for success messages
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
 
-  // Load content on mount
+  // Load full content on mount
   useEffect(() => {
-    const cachedContent = localStorage.getItem(`content_${page}_${field}`);
-    if (cachedContent) {
-      const parsedContent = JSON.parse(cachedContent);
-      setContent(parsedContent);
-    }
     const fetchContent = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/content/${page}`); // Relative path for proxy
+        const response = await fetch(`/api/content/${page}`);
         if (response.ok) {
           const data = await response.json();
-          const newContent = data.content?.content?.[field] || initialContent; // Handle nested content
-          setContent(newContent);
-          localStorage.setItem(`content_${page}_${field}`, JSON.stringify(newContent));
-        } else if (!cachedContent) {
-          setContent(initialContent);
+          setContent(data.content || {});
+          localStorage.setItem(`content_${page}`, JSON.stringify(data.content || {}));
+        } else {
+          setContent({ [field]: initialContent });
+          localStorage.setItem(`content_${page}`, JSON.stringify({ [field]: initialContent }));
         }
       } catch (err) {
-        if (!cachedContent) setContent(initialContent);
-        setError('Failed to fetch content.');
+        const cachedContent = localStorage.getItem(`content_${page}`);
+        setContent(cachedContent ? JSON.parse(cachedContent) : { [field]: initialContent });
+        setError('Failed to fetch content. Using cached or initial content.');
       } finally {
         setIsLoading(false);
       }
@@ -41,26 +37,26 @@ const EditableSection = ({ page, initialContent, field }) => {
   // Handle save
   const handleSave = async () => {
     if (!isAdmin || !token) {
-      localStorage.setItem(`content_${page}_${field}`, JSON.stringify(content));
-      setError('Only admins can save changes. Please log in. Content cached locally.');
+      setContent((prev) => ({ ...prev, [field]: content[field] }));
+      localStorage.setItem(`content_${page}`, JSON.stringify({ ...content, [field]: content[field] }));
+      setError('Only admins can save changes to the server. Content cached locally.');
       setIsEditing(false);
       return;
     }
     setIsLoading(true);
     try {
       const response = await fetchWithToken(
-        `/api/content/${page}`, // Relative path for proxy
+        `/api/content/${page}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: { [field]: content } }),
+          body: JSON.stringify({ content: { ...content, [field]: content[field] } }),
         }
       );
       if (response.ok) {
         const data = await response.json();
-        const savedContent = data.content?.content?.[field] || content; // Handle nested content
-        setContent(savedContent);
-        localStorage.setItem(`content_${page}_${field}`, JSON.stringify(savedContent));
+        setContent(data.content || {});
+        localStorage.setItem(`content_${page}`, JSON.stringify(data.content || {}));
         setSuccess('Content saved successfully!');
         setIsEditing(false);
       } else {
@@ -68,7 +64,7 @@ const EditableSection = ({ page, initialContent, field }) => {
       }
     } catch (err) {
       setError(`Failed to save content: ${err.message}`);
-      localStorage.setItem(`content_${page}_${field}`, JSON.stringify(content));
+      localStorage.setItem(`content_${page}`, JSON.stringify({ ...content, [field]: content[field] }));
     } finally {
       setIsLoading(false);
     }
@@ -81,8 +77,8 @@ const EditableSection = ({ page, initialContent, field }) => {
       {isEditing ? (
         <>
           <textarea
-            value={content || ''}
-            onChange={(e) => setContent(e.target.value)}
+            value={content[field] || ''}
+            onChange={(e) => setContent((prev) => ({ ...prev, [field]: e.target.value }))}
             className="w-full p-2 border rounded mb-2 text-gray-900"
             rows="4"
           />
@@ -101,7 +97,7 @@ const EditableSection = ({ page, initialContent, field }) => {
         </>
       ) : isAdmin ? (
         <>
-          <p className="text-gray-700">{content || ''}</p>
+          <p className="text-gray-700">{content[field] || ''}</p>
           <button
             onClick={() => setIsEditing(true)}
             className="mt-2 bg-blue-600 text-white p-2 rounded"
@@ -110,7 +106,7 @@ const EditableSection = ({ page, initialContent, field }) => {
           </button>
         </>
       ) : (
-        <p className="text-gray-700">{content || ''}</p>
+        <p className="text-gray-700">{content[field] || ''}</p>
       )}
       {error && <div className="text-red-500 mt-2">{error}</div>}
       {success && <div className="text-green-500 mt-2">{success}</div>}

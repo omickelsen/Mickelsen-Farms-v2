@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import EditableSection from '../components/EditableSection';
-import ImageUpload from '../components/ImageUpload';
 import PdfUpload from '../components/PdfUpload';
 import PdfDownload from '../components/PdfDownload';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
 
-// Function to extract the original filename from URL, removing the timestamp prefix
 const getFilenameFromUrl = (url) => {
   const parts = url.substring(url.lastIndexOf('/') + 1).split('-');
   return parts.slice(1).join('-');
@@ -14,18 +12,9 @@ const getFilenameFromUrl = (url) => {
 function Events() {
   const { isAdmin, token } = useAuth();
   const [imageUrls, setImageUrls] = useState([]);
-  const [dayCampPdf, setDayCampPdf] = useState(() => {
-    const saved = localStorage.getItem('events_dayCampPdf');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [partyPdf, setPartyPdf] = useState(() => {
-    const saved = localStorage.getItem('events_partyPdf');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [waiverPdf, setWaiverPdf] = useState(() => {
-    const saved = localStorage.getItem('events_waiverPdf');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [dayCampPdf, setDayCampPdf] = useState([]);
+  const [partyPdf, setPartyPdf] = useState([]);
+  const [waiverPdf, setWaiverPdf] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -33,140 +22,118 @@ function Events() {
         const imageResponse = await fetch('/api/images?page=events');
         const imageData = await imageResponse.json();
         setImageUrls(imageData.images || []);
+
+        const pdfResponse = await fetch('/api/pdfs?page=events');
+        if (!pdfResponse.ok) throw new Error('Failed to fetch PDFs');
+        const pdfData = await pdfResponse.json();
+        setDayCampPdf(pdfData.pdfs.filter(url => url.includes('day-camp')) || []);
+        setPartyPdf(pdfData.pdfs.filter(url => url.includes('party')) || []);
+        setWaiverPdf(pdfData.pdfs.filter(url => url.includes('waiver')) || []);
+        localStorage.setItem('events_dayCampPdf', JSON.stringify(pdfData.pdfs.filter(url => url.includes('day-camp')) || []));
+        localStorage.setItem('events_partyPdf', JSON.stringify(pdfData.pdfs.filter(url => url.includes('party')) || []));
+        localStorage.setItem('events_waiverPdf', JSON.stringify(pdfData.pdfs.filter(url => url.includes('waiver')) || []));
       } catch (err) {
-        // Error handled silently in production
+        console.error('Fetch error:', err);
+        const savedDayCamp = localStorage.getItem('events_dayCampPdf');
+        const savedParty = localStorage.getItem('events_partyPdf');
+        const savedWaiver = localStorage.getItem('events_waiverPdf');
+        if (savedDayCamp) setDayCampPdf(JSON.parse(savedDayCamp));
+        if (savedParty) setPartyPdf(JSON.parse(savedParty));
+        if (savedWaiver) setWaiverPdf(JSON.parse(savedWaiver));
       }
     };
     fetchData();
   }, []);
 
   const handleImageUpload = async (event) => {
-    if (!isAdmin) {
-      return;
-    }
-
+    if (!isAdmin) return;
     const files = event.target.files;
     if (!files.length) return;
-
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append('image', file));
-
     try {
       const uploadResponse = await fetchWithToken('/api/images', {
         method: 'POST',
         body: formData,
         headers: { 'Page': 'events' },
       });
-
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        throw new Error(`Failed to upload image: ${errorText}`);
-      }
-      const uploadData = await uploadResponse.json();
-
+      if (!uploadResponse.ok) throw new Error('Image upload failed');
       const updatedResponse = await fetch('/api/images?page=events');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         setImageUrls(updatedData.images || []);
       }
     } catch (err) {
-      // Error handled silently in production
+      console.error(err);
     }
   };
 
   const handleImageDelete = async (urlToRemove) => {
-    if (!isAdmin) {
-      return;
-    }
-
+    if (!isAdmin) return;
     try {
       const deleteResponse = await fetchWithToken('/api/images', {
         method: 'DELETE',
         headers: { 'Page': 'events', 'Url': urlToRemove },
       });
-
-      if (!deleteResponse.ok) {
-        const errorText = await deleteResponse.text();
-        throw new Error(`Failed to delete image: ${errorText}`);
-      }
-
+      if (!deleteResponse.ok) throw new Error('Image delete failed');
       const updatedResponse = await fetch('/api/images?page=events');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         setImageUrls(updatedData.images || []);
       }
     } catch (err) {
-      // Error handled silently in production
+      console.error(err);
     }
   };
 
-  const [selectedImage, setSelectedImage] = useState(null);
-
-  const openModal = (url) => {
-    setSelectedImage(url);
-  };
-
-  const closeModal = () => {
-    setSelectedImage(null);
-  };
-
-  const handlePdfUpload = (url, section) => {
-    if (!isAdmin) {
-      return;
-    }
-
-    if (section === 'dayCamp') {
-      setDayCampPdf((prev) => {
-        const updated = [...prev, url];
-        localStorage.setItem('events_dayCampPdf', JSON.stringify(updated));
-        return updated;
-      });
-    } else if (section === 'party') {
-      setPartyPdf((prev) => {
-        const updated = [...prev, url];
-        localStorage.setItem('events_partyPdf', JSON.stringify(updated));
-        return updated;
-      });
-    } else if (section === 'waiver') {
-      setWaiverPdf((prev) => {
-        const updated = [...prev, url];
-        localStorage.setItem('events_waiverPdf', JSON.stringify(updated));
-        return updated;
-      });
+  const handlePdfUpload = async (url, section) => {
+    if (!isAdmin) return;
+    const updatedResponse = await fetch('/api/pdfs?page=events');
+    if (updatedResponse.ok) {
+      const updatedData = await updatedResponse.json();
+      if (section === 'dayCamp') {
+        setDayCampPdf(updatedData.pdfs.filter(url => url.includes('day-camp')) || []);
+        localStorage.setItem('events_dayCampPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('day-camp')) || []));
+      } else if (section === 'party') {
+        setPartyPdf(updatedData.pdfs.filter(url => url.includes('party')) || []);
+        localStorage.setItem('events_partyPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('party')) || []));
+      } else if (section === 'waiver') {
+        setWaiverPdf(updatedData.pdfs.filter(url => url.includes('waiver')) || []);
+        localStorage.setItem('events_waiverPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('waiver')) || []));
+      }
     }
   };
 
   const handlePdfRemove = async (urlToRemove, section) => {
-    if (!isAdmin) {
-      return;
-    }
-
-    const response = await fetchWithToken('/api/pdfs', {
-      method: 'DELETE',
-      headers: { 'Page': 'events', 'Url': urlToRemove },
-    });
-    if (response.ok) {
-      if (section === 'dayCamp') {
-        setDayCampPdf((prev) => {
-          const updated = prev.filter((url) => url !== urlToRemove);
-          localStorage.setItem('events_dayCampPdf', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (section === 'party') {
-        setPartyPdf((prev) => {
-          const updated = prev.filter((url) => url !== urlToRemove);
-          localStorage.setItem('events_partyPdf', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (section === 'waiver') {
-        setWaiverPdf((prev) => {
-          const updated = prev.filter((url) => url !== urlToRemove);
-          localStorage.setItem('events_waiverPdf', JSON.stringify(updated));
-          return updated;
-        });
+    if (!isAdmin) return;
+    try {
+      const response = await fetchWithToken('/api/pdfs', {
+        method: 'DELETE',
+        headers: { 'Page': 'events', 'Url': urlToRemove },
+      });
+      if (!response.ok) throw new Error('PDF delete failed');
+      const updatedResponse = await fetch('/api/pdfs?page=events');
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        if (section === 'dayCamp') {
+          setDayCampPdf(updatedData.pdfs.filter(url => url.includes('day-camp')) || []);
+          localStorage.setItem('events_dayCampPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('day-camp')) || []));
+        } else if (section === 'party') {
+          setPartyPdf(updatedData.pdfs.filter(url => url.includes('party')) || []);
+          localStorage.setItem('events_partyPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('party')) || []));
+        } else if (section === 'waiver') {
+          setWaiverPdf(updatedData.pdfs.filter(url => url.includes('waiver')) || []);
+          localStorage.setItem('events_waiverPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('waiver')) || []));
+        }
       }
+    } catch (err) {
+      console.error(err);
     }
   };
+
+  const [selectedImage, setSelectedImage] = useState(null);
+  const openModal = (url) => setSelectedImage(url);
+  const closeModal = () => setSelectedImage(null);
 
   return (
     <div className="py-16 bg-gray-50 min-h-screen">
@@ -252,15 +219,11 @@ function Events() {
           </div>
         </div>
       </div>
-
       {selectedImage && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={closeModal}>
           <div className="relative">
             <img src={selectedImage} alt="Enlarged" className="max-h-[90vh] max-w-[90vw]" />
-            <button
-              onClick={closeModal}
-              className="absolute top-2 right-2 text-white bg-red-600 p-2 rounded"
-            >
+            <button onClick={closeModal} className="absolute top-2 right-2 text-white bg-red-600 p-2 rounded">
               Close
             </button>
           </div>
