@@ -6,7 +6,7 @@ router.get('/:page', async (req, res) => {
   console.log(`[Server] Received GET request for /api/content/${req.params.page}`);
   try {
     const content = await Content.findOne({ page: req.params.page });
-    console.log(`[Server] Found content for ${req.params.page}:`, content);
+    console.log(`[Server] Found content in database for ${req.params.page}:`, content);
     if (content) {
       res.json(content); // Return the full document
     } else {
@@ -23,18 +23,18 @@ router.get('/:page', async (req, res) => {
 router.post('/:page', async (req, res) => {
   console.log(`[Server] Received POST request for /api/content/${req.params.page} with body:`, req.body);
   try {
-    const updates = req.body; // Accept any field updates directly
-    if (!updates || Object.keys(updates).length === 0) {
+    const updates = req.body.content || {}; // Ensure we get the content object
+    if (Object.keys(updates).length === 0) {
       throw new Error('No valid content data provided');
     }
     const existingContent = await Content.findOne({ page: req.params.page }) || { page: req.params.page, content: {} };
-    console.log(`[Server] Existing content for ${req.params.page}:`, existingContent);
+    console.log(`[Server] Existing content before update for ${req.params.page}:`, existingContent);
     const updatedContent = await Content.findOneAndUpdate(
       { page: req.params.page },
-      { $set: { content: { ...existingContent.content, ...updates } } }, // Merge updates into content object
+      { $set: { content: { ...existingContent.content, ...updates } } }, // Merge updates
       { new: true, upsert: true, runValidators: true }
     );
-    console.log(`[Server] Updated content for ${req.params.page} in database:`, updatedContent);
+    console.log(`[Server] Updated content in database for ${req.params.page}:`, updatedContent);
     if (!updatedContent || !updatedContent.content) {
       throw new Error('Database update failed to return content');
     }

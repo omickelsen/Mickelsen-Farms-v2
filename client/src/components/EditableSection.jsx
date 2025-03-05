@@ -3,13 +3,13 @@ import { useAuth, fetchWithToken } from '../context/AuthContext';
 
 const EditableSection = ({ page, initialContent, field }) => {
   const { token, isAdmin } = useAuth() || {};
-  const [content, setContent] = useState({ [field]: initialContent }); // Initialize with initialContent for the field
+  const [content, setContent] = useState(initialContent); // Start with initialContent
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Load full content on mount
+  // Load content from database on mount and refresh
   useEffect(() => {
     const fetchContent = async () => {
       setIsLoading(true);
@@ -17,15 +17,18 @@ const EditableSection = ({ page, initialContent, field }) => {
         const response = await fetch(`/api/content/${page}`);
         if (response.ok) {
           const data = await response.json();
-          setContent(prev => ({ ...prev, ...data.content })); // Merge fetched content with existing state
-          localStorage.setItem(`content_${page}`, JSON.stringify(data.content || {}));
+          const newContent = data.content?.[field] || initialContent; // Use specific field from server
+          setContent(newContent);
+          localStorage.setItem(`content_${page}_${field}`, JSON.stringify(newContent)); // Store per field
         } else {
-          setContent(prev => ({ ...prev, [field]: initialContent })); // Fallback to initialContent
-          localStorage.setItem(`content_${page}`, JSON.stringify({ [field]: initialContent }));
+          console.warn(`Fetch failed with status ${response.status}, using local storage for ${page}, ${field}`);
+          const cachedContent = localStorage.getItem(`content_${page}_${field}`);
+          setContent(cachedContent ? JSON.parse(cachedContent) : initialContent);
         }
       } catch (err) {
-        const cachedContent = localStorage.getItem(`content_${page}`);
-        setContent(cachedContent ? { ...JSON.parse(cachedContent), [field]: initialContent } : { [field]: initialContent });
+        console.error(`Fetch error for ${page}, ${field}:`, err);
+        const cachedContent = localStorage.getItem(`content_${page}_${field}`);
+        setContent(cachedContent ? JSON.parse(cachedContent) : initialContent);
         setError('Failed to fetch content. Using cached or initial content.');
       } finally {
         setIsLoading(false);
@@ -37,35 +40,42 @@ const EditableSection = ({ page, initialContent, field }) => {
   // Handle save
   const handleSave = async () => {
     if (!isAdmin || !token) {
-      setContent(prev => ({ ...prev, [field]: content[field] }));
-      localStorage.setItem(`content_${page}`, JSON.stringify(content));
+      setContent(content);
+      localStorage.setItem(`content_${page}_${field}`, JSON.stringify(content));
       setError('Only admins can save changes to the server. Content cached locally.');
       setIsEditing(false);
       return;
     }
     setIsLoading(true);
+    const updatedContent = content;
+    localStorage.setItem(`content_${page}_${field}`, JSON.stringify(updatedContent)); // Save locally first
     try {
       const response = await fetchWithToken(
         `/api/content/${page}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: { ...content, [field]: content[field] } }),
+          body: JSON.stringify({ content: { [field]: updatedContent } }),
         }
       );
       if (response.ok) {
         const data = await response.json();
-        setContent({ ...data.content }); // Update with full content from response
-        localStorage.setItem(`content_${page}`, JSON.stringify(data.content || {}));
+        const newContent = data.content?.[field] || updatedContent;
+        setContent(newContent);
+        localStorage.setItem(`content_${page}_${field}`, JSON.stringify(newContent));
         setSuccess('Content saved successfully!');
-        setIsEditing(false);
       } else {
-        throw new Error('Failed to save content');
+        console.warn(`Save failed with status ${response.status} for ${page}, ${field}, using local content`);
+        setContent(updatedContent);
+        setError(`Failed to save to server: ${await response.text()}. Using locally cached content.`);
       }
     } catch (err) {
-      setError(`Failed to save content: ${err.message}`);
-      localStorage.setItem(`content_${page}`, JSON.stringify(content));
+      console.error(`Save error for ${page}, ${field}:`, err);
+      setContent(updatedContent);
+      setError(`Failed to save to server: ${err.message}. Using locally cached content.`);
+      localStorage.setItem(`content_${page}_${field}`, JSON.stringify(updatedContent));
     } finally {
+      setIsEditing(false);
       setIsLoading(false);
     }
   };
@@ -77,8 +87,8 @@ const EditableSection = ({ page, initialContent, field }) => {
       {isEditing ? (
         <>
           <textarea
-            value={content[field] || ''}
-            onChange={(e) => setContent(prev => ({ ...prev, [field]: e.target.value }))}
+            value={content ?? initialContent}
+            onChange={(e) => setContent(e.target.value)}
             className="w-full p-2 border rounded mb-2 text-gray-900"
             rows="4"
           />
@@ -97,7 +107,7 @@ const EditableSection = ({ page, initialContent, field }) => {
         </>
       ) : isAdmin ? (
         <>
-          <p className="text-gray-700">{content[field] || ''}</p>
+          <p className="text-gray-700">{content ?? initialContent}</p>
           <button
             onClick={() => setIsEditing(true)}
             className="mt-2 bg-blue-600 text-white p-2 rounded"
@@ -106,7 +116,7 @@ const EditableSection = ({ page, initialContent, field }) => {
           </button>
         </>
       ) : (
-        <p className="text-gray-700">{content[field] || ''}</p>
+        <p className="text-gray-700">{content ?? initialContent}</p>
       )}
       {error && <div className="text-red-500 mt-2">{error}</div>}
       {success && <div className="text-green-500 mt-2">{success}</div>}
