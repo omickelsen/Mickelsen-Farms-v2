@@ -26,9 +26,22 @@ function HorseLessons() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const imageResponse = await fetch('/api/images?page=horse-lessons');
-        const imageData = await imageResponse.json();
-        setImageUrls(imageData.images || []);
+        const cacheBuster = new Date().getTime();
+        const response = await fetch(`/api/images?page=horse-lessons&t=${cacheBuster}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        setImageUrls(data.images || []);
+        // Sync with backend to remove phantoms
+        const savedImages = localStorage.getItem('imageUrls');
+        if (savedImages) {
+          const savedUrls = JSON.parse(savedImages);
+          const validUrls = data.images.filter(url => savedUrls.includes(url));
+          if (validUrls.length !== savedUrls.length) {
+            localStorage.setItem('imageUrls', JSON.stringify(data.images));
+          }
+        } else {
+          localStorage.setItem('imageUrls', JSON.stringify(data.images));
+        }
       } catch (err) {
         // Error handled silently in production
       }
@@ -37,9 +50,7 @@ function HorseLessons() {
   }, []);
 
   const handleImageUpload = async (event) => {
-    if (!isAdmin) {
-      return;
-    }
+    if (!isAdmin) return;
 
     const files = event.target.files;
     if (!files.length) return;
@@ -64,6 +75,7 @@ function HorseLessons() {
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         setImageUrls(updatedData.images || []);
+        localStorage.setItem('imageUrls', JSON.stringify(updatedData.images));
       }
     } catch (err) {
       // Error handled silently in production
@@ -71,9 +83,7 @@ function HorseLessons() {
   };
 
   const handleImageDelete = async (urlToRemove) => {
-    if (!isAdmin) {
-      return;
-    }
+    if (!isAdmin) return;
 
     try {
       const deleteResponse = await fetchWithToken('/api/images', {
@@ -86,10 +96,12 @@ function HorseLessons() {
         throw new Error(`Failed to delete image: ${errorText}`);
       }
 
+      // Fetch updated list to sync state
       const updatedResponse = await fetch('/api/images?page=horse-lessons');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         setImageUrls(updatedData.images || []);
+        localStorage.setItem('imageUrls', JSON.stringify(updatedData.images));
       }
     } catch (err) {
       // Error handled silently in production
@@ -107,9 +119,7 @@ function HorseLessons() {
   };
 
   const handlePdfUpload = (url, section) => {
-    if (!isAdmin) {
-      return;
-    }
+    if (!isAdmin) return;
 
     if (section === 'ridingLevels') {
       setRidingLevelsPdf((prev) => {
@@ -127,9 +137,7 @@ function HorseLessons() {
   };
 
   const handlePdfRemove = async (urlToRemove, section) => {
-    if (!isAdmin) {
-      return;
-    }
+    if (!isAdmin) return;
 
     const response = await fetchWithToken('/api/pdfs', {
       method: 'DELETE',
