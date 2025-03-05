@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "concurrently \"cd client && npm run dev\" \"cd server && node index.js\"",
-    "dev": "concurrently \"cd client && npm run dev\" \"cd server && node --inspect index.js\""
+    "dev": "concurrently \"cd client && npm run dev\" \"cd server && node --inspect index.js\"",
+    "heroku-postbuild": "cd client && npm install && npm run build && cd ../server && npm install"
   },
   "devDependencies": {
     "@types/node": "^22.13.9",
