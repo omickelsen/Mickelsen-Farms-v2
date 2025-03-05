@@ -20,11 +20,7 @@ const ImageUpload = ({ onUpload, page }) => {
           headers: { 'Page': page || 'default' },
         });
         const data = await response.json();
-        if (!response.ok) throw new Error('Failed to upload image');
-        const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
-        const cleanUrl = data.url.startsWith('http') ? data.url.replace(/^http:\/\/localhost:5000/, '') : data.url;
-        const fullUrl = `${baseUrl}${cleanUrl}`;
-        if (onUpload) onUpload(fullUrl);
+        if (onUpload) onUpload(data.url);
       } catch (err) {
         // Error handled silently in production
       }
