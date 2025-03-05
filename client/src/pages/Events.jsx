@@ -9,6 +9,15 @@ const getFilenameFromUrl = (url) => {
   return parts.slice(1).join('-');
 };
 
+// Map filenames to sections
+const categorizePdf = (url) => {
+  const filename = getFilenameFromUrl(url).toLowerCase();
+  if (filename.includes('day-camp') || filename.includes('camp')) return 'dayCamp';
+  if (filename.includes('party')) return 'party';
+  if (filename.includes('waiver') || filename.includes('liability')) return 'waiver';
+  return 'dayCamp'; // Default fallback (adjust as needed)
+};
+
 function Events() {
   const { isAdmin, token } = useAuth();
   const [imageUrls, setImageUrls] = useState([]);
@@ -26,12 +35,20 @@ function Events() {
         const pdfResponse = await fetch('/api/pdfs?page=events');
         if (!pdfResponse.ok) throw new Error('Failed to fetch PDFs');
         const pdfData = await pdfResponse.json();
-        setDayCampPdf(pdfData.pdfs.filter(url => url.includes('day-camp')) || []);
-        setPartyPdf(pdfData.pdfs.filter(url => url.includes('party')) || []);
-        setWaiverPdf(pdfData.pdfs.filter(url => url.includes('waiver')) || []);
-        localStorage.setItem('events_dayCampPdf', JSON.stringify(pdfData.pdfs.filter(url => url.includes('day-camp')) || []));
-        localStorage.setItem('events_partyPdf', JSON.stringify(pdfData.pdfs.filter(url => url.includes('party')) || []));
-        localStorage.setItem('events_waiverPdf', JSON.stringify(pdfData.pdfs.filter(url => url.includes('waiver')) || []));
+        const validPdfs = pdfData.pdfs.filter(url => url.endsWith('.pdf'));
+        const categorizedPdfs = validPdfs.reduce((acc, url) => {
+          const category = categorizePdf(url);
+          if (category === 'dayCamp') acc.dayCamp.push(url);
+          else if (category === 'party') acc.party.push(url);
+          else if (category === 'waiver') acc.waiver.push(url);
+          return acc;
+        }, { dayCamp: [], party: [], waiver: [] });
+        setDayCampPdf(categorizedPdfs.dayCamp);
+        setPartyPdf(categorizedPdfs.party);
+        setWaiverPdf(categorizedPdfs.waiver);
+        localStorage.setItem('events_dayCampPdf', JSON.stringify(categorizedPdfs.dayCamp));
+        localStorage.setItem('events_partyPdf', JSON.stringify(categorizedPdfs.party));
+        localStorage.setItem('events_waiverPdf', JSON.stringify(categorizedPdfs.waiver));
       } catch (err) {
         console.error('Fetch error:', err);
         const savedDayCamp = localStorage.getItem('events_dayCampPdf');
@@ -91,16 +108,20 @@ function Events() {
     const updatedResponse = await fetch('/api/pdfs?page=events');
     if (updatedResponse.ok) {
       const updatedData = await updatedResponse.json();
-      if (section === 'dayCamp') {
-        setDayCampPdf(updatedData.pdfs.filter(url => url.includes('day-camp')) || []);
-        localStorage.setItem('events_dayCampPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('day-camp')) || []));
-      } else if (section === 'party') {
-        setPartyPdf(updatedData.pdfs.filter(url => url.includes('party')) || []);
-        localStorage.setItem('events_partyPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('party')) || []));
-      } else if (section === 'waiver') {
-        setWaiverPdf(updatedData.pdfs.filter(url => url.includes('waiver')) || []);
-        localStorage.setItem('events_waiverPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('waiver')) || []));
-      }
+      const validPdfs = updatedData.pdfs.filter(url => url.endsWith('.pdf'));
+      const categorizedPdfs = validPdfs.reduce((acc, url) => {
+        const category = categorizePdf(url);
+        if (category === 'dayCamp') acc.dayCamp.push(url);
+        else if (category === 'party') acc.party.push(url);
+        else if (category === 'waiver') acc.waiver.push(url);
+        return acc;
+      }, { dayCamp: [], party: [], waiver: [] });
+      setDayCampPdf(categorizedPdfs.dayCamp);
+      setPartyPdf(categorizedPdfs.party);
+      setWaiverPdf(categorizedPdfs.waiver);
+      localStorage.setItem('events_dayCampPdf', JSON.stringify(categorizedPdfs.dayCamp));
+      localStorage.setItem('events_partyPdf', JSON.stringify(categorizedPdfs.party));
+      localStorage.setItem('events_waiverPdf', JSON.stringify(categorizedPdfs.waiver));
     }
   };
 
@@ -111,20 +132,26 @@ function Events() {
         method: 'DELETE',
         headers: { 'Page': 'events', 'Url': urlToRemove },
       });
-      if (!response.ok) throw new Error('PDF delete failed');
+      if (!response.ok) {
+        console.warn(`DELETE failed for ${urlToRemove} with status ${response.status}`);
+      }
       const updatedResponse = await fetch('/api/pdfs?page=events');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        if (section === 'dayCamp') {
-          setDayCampPdf(updatedData.pdfs.filter(url => url.includes('day-camp')) || []);
-          localStorage.setItem('events_dayCampPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('day-camp')) || []));
-        } else if (section === 'party') {
-          setPartyPdf(updatedData.pdfs.filter(url => url.includes('party')) || []);
-          localStorage.setItem('events_partyPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('party')) || []));
-        } else if (section === 'waiver') {
-          setWaiverPdf(updatedData.pdfs.filter(url => url.includes('waiver')) || []);
-          localStorage.setItem('events_waiverPdf', JSON.stringify(updatedData.pdfs.filter(url => url.includes('waiver')) || []));
-        }
+        const validPdfs = updatedData.pdfs.filter(url => url.endsWith('.pdf'));
+        const categorizedPdfs = validPdfs.reduce((acc, url) => {
+          const category = categorizePdf(url);
+          if (category === 'dayCamp') acc.dayCamp.push(url);
+          else if (category === 'party') acc.party.push(url);
+          else if (category === 'waiver') acc.waiver.push(url);
+          return acc;
+        }, { dayCamp: [], party: [], waiver: [] });
+        setDayCampPdf(categorizedPdfs.dayCamp);
+        setPartyPdf(categorizedPdfs.party);
+        setWaiverPdf(categorizedPdfs.waiver);
+        localStorage.setItem('events_dayCampPdf', JSON.stringify(categorizedPdfs.dayCamp));
+        localStorage.setItem('events_partyPdf', JSON.stringify(categorizedPdfs.party));
+        localStorage.setItem('events_waiverPdf', JSON.stringify(categorizedPdfs.waiver));
       }
     } catch (err) {
       console.error(err);
