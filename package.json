@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "concurrently \"cd client && npm run dev\" \"cd server && node index.js\"",
     "dev": "concurrently \"cd client && npm run dev\" \"cd server && node --inspect index.js\"",
-    "heroku-postbuild": "cd client && npm install && npm run build && cd ../server && npm install"
+    "heroku-postbuild": "npm --prefix client install --production=false && npm --prefix client run build && npm --prefix server install --production=false"
+
   },
   "devDependencies": {
     "@types/node": "^22.13.9",
