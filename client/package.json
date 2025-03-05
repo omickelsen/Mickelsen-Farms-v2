@@ -8,11 +8,12 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
-  }, 
+  },
   "dependencies": {
     "autoprefixer": "^10.4.20",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
+    "mickelsen-farms-v2": "file:..",
     "postcss": "^8.5.3",
     "react": "^19.0.0",
     "react-big-calendar": "^1.18.0",

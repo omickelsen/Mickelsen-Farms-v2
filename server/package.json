@@ -19,6 +19,7 @@
     "google-auth-library": "^9.15.1",
     "googleapis": "^144.0.0",
     "jsonwebtoken": "^9.0.2",
+    "mickelsen-farms-v2": "file:..",
     "moment": "^2.30.1",
     "moment-timezone": "^0.5.47",
     "mongoose": "^8.10.2",
