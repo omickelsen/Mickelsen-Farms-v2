@@ -3,7 +3,7 @@ import { useAuth, fetchWithToken } from '../context/AuthContext';
 
 const EditableSection = ({ page, initialContent, field }) => {
   const { token, isAdmin } = useAuth() || {};
-  const [content, setContent] = useState({});
+  const [content, setContent] = useState({ [field]: initialContent }); // Initialize with initialContent for the field
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,15 +17,15 @@ const EditableSection = ({ page, initialContent, field }) => {
         const response = await fetch(`/api/content/${page}`);
         if (response.ok) {
           const data = await response.json();
-          setContent(data.content || {});
+          setContent(prev => ({ ...prev, ...data.content })); // Merge fetched content with existing state
           localStorage.setItem(`content_${page}`, JSON.stringify(data.content || {}));
         } else {
-          setContent({ [field]: initialContent });
+          setContent(prev => ({ ...prev, [field]: initialContent })); // Fallback to initialContent
           localStorage.setItem(`content_${page}`, JSON.stringify({ [field]: initialContent }));
         }
       } catch (err) {
         const cachedContent = localStorage.getItem(`content_${page}`);
-        setContent(cachedContent ? JSON.parse(cachedContent) : { [field]: initialContent });
+        setContent(cachedContent ? { ...JSON.parse(cachedContent), [field]: initialContent } : { [field]: initialContent });
         setError('Failed to fetch content. Using cached or initial content.');
       } finally {
         setIsLoading(false);
@@ -37,8 +37,8 @@ const EditableSection = ({ page, initialContent, field }) => {
   // Handle save
   const handleSave = async () => {
     if (!isAdmin || !token) {
-      setContent((prev) => ({ ...prev, [field]: content[field] }));
-      localStorage.setItem(`content_${page}`, JSON.stringify({ ...content, [field]: content[field] }));
+      setContent(prev => ({ ...prev, [field]: content[field] }));
+      localStorage.setItem(`content_${page}`, JSON.stringify(content));
       setError('Only admins can save changes to the server. Content cached locally.');
       setIsEditing(false);
       return;
@@ -55,7 +55,7 @@ const EditableSection = ({ page, initialContent, field }) => {
       );
       if (response.ok) {
         const data = await response.json();
-        setContent(data.content || {});
+        setContent({ ...data.content }); // Update with full content from response
         localStorage.setItem(`content_${page}`, JSON.stringify(data.content || {}));
         setSuccess('Content saved successfully!');
         setIsEditing(false);
@@ -64,7 +64,7 @@ const EditableSection = ({ page, initialContent, field }) => {
       }
     } catch (err) {
       setError(`Failed to save content: ${err.message}`);
-      localStorage.setItem(`content_${page}`, JSON.stringify({ ...content, [field]: content[field] }));
+      localStorage.setItem(`content_${page}`, JSON.stringify(content));
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +78,7 @@ const EditableSection = ({ page, initialContent, field }) => {
         <>
           <textarea
             value={content[field] || ''}
-            onChange={(e) => setContent((prev) => ({ ...prev, [field]: e.target.value }))}
+            onChange={(e) => setContent(prev => ({ ...prev, [field]: e.target.value }))}
             className="w-full p-2 border rounded mb-2 text-gray-900"
             rows="4"
           />

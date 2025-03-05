@@ -9,6 +9,14 @@ const getFilenameFromUrl = (url) => {
   return parts.slice(1).join('-');
 };
 
+// Map filenames to sections (adjust based on your naming convention)
+const categorizePdf = (url) => {
+  const filename = getFilenameFromUrl(url).toLowerCase();
+  if (filename.includes('riding') || filename.includes('level')) return 'ridingLevels';
+  if (filename.includes('registration') || filename.includes('reg')) return 'registration';
+  return 'registration'; // Default to registration if unclear
+};
+
 function HorseLessons() {
   const { isAdmin, token } = useAuth();
   const [imageUrls, setImageUrls] = useState([]);
@@ -27,11 +35,17 @@ function HorseLessons() {
         const pdfResponse = await fetch(`/api/pdfs?page=horse-lessons&t=${cacheBuster}`);
         if (!pdfResponse.ok) throw new Error('Failed to fetch PDFs');
         const pdfData = await pdfResponse.json();
-        const validPdfs = pdfData.pdfs.filter(url => url.endsWith('.pdf')); // Filter out non-PDFs
-        setRidingLevelsPdf(validPdfs.filter(url => url.includes('riding-levels')) || []);
-        setRegistrationPdf(validPdfs.filter(url => !url.includes('riding-levels')) || []);
-        localStorage.setItem('ridingLevelsPdf', JSON.stringify(validPdfs.filter(url => url.includes('riding-levels')) || []));
-        localStorage.setItem('registrationPdf', JSON.stringify(validPdfs.filter(url => !url.includes('riding-levels')) || []));
+        const validPdfs = pdfData.pdfs.filter(url => url.endsWith('.pdf'));
+        const categorizedPdfs = validPdfs.reduce((acc, url) => {
+          const category = categorizePdf(url);
+          if (category === 'ridingLevels') acc.ridingLevels.push(url);
+          else acc.registration.push(url);
+          return acc;
+        }, { ridingLevels: [], registration: [] });
+        setRidingLevelsPdf(categorizedPdfs.ridingLevels);
+        setRegistrationPdf(categorizedPdfs.registration);
+        localStorage.setItem('ridingLevelsPdf', JSON.stringify(categorizedPdfs.ridingLevels));
+        localStorage.setItem('registrationPdf', JSON.stringify(categorizedPdfs.registration));
       } catch (err) {
         console.error('Fetch error:', err);
         const savedRidingLevels = localStorage.getItem('ridingLevelsPdf');
@@ -92,13 +106,16 @@ function HorseLessons() {
     if (updatedResponse.ok) {
       const updatedData = await updatedResponse.json();
       const validPdfs = updatedData.pdfs.filter(url => url.endsWith('.pdf'));
-      if (section === 'ridingLevels') {
-        setRidingLevelsPdf(validPdfs.filter(url => url.includes('riding-levels')) || []);
-        localStorage.setItem('ridingLevelsPdf', JSON.stringify(validPdfs.filter(url => url.includes('riding-levels')) || []));
-      } else if (section === 'registration') {
-        setRegistrationPdf(validPdfs.filter(url => !url.includes('riding-levels')) || []);
-        localStorage.setItem('registrationPdf', JSON.stringify(validPdfs.filter(url => !url.includes('riding-levels')) || []));
-      }
+      const categorizedPdfs = validPdfs.reduce((acc, url) => {
+        const category = categorizePdf(url);
+        if (category === 'ridingLevels') acc.ridingLevels.push(url);
+        else acc.registration.push(url);
+        return acc;
+      }, { ridingLevels: [], registration: [] });
+      setRidingLevelsPdf(categorizedPdfs.ridingLevels);
+      setRegistrationPdf(categorizedPdfs.registration);
+      localStorage.setItem('ridingLevelsPdf', JSON.stringify(categorizedPdfs.ridingLevels));
+      localStorage.setItem('registrationPdf', JSON.stringify(categorizedPdfs.registration));
     }
   };
 
@@ -116,13 +133,16 @@ function HorseLessons() {
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         const validPdfs = updatedData.pdfs.filter(url => url.endsWith('.pdf'));
-        if (section === 'ridingLevels') {
-          setRidingLevelsPdf(validPdfs.filter(url => url.includes('riding-levels')) || []);
-          localStorage.setItem('ridingLevelsPdf', JSON.stringify(validPdfs.filter(url => url.includes('riding-levels')) || []));
-        } else if (section === 'registration') {
-          setRegistrationPdf(validPdfs.filter(url => !url.includes('riding-levels')) || []);
-          localStorage.setItem('registrationPdf', JSON.stringify(validPdfs.filter(url => !url.includes('riding-levels')) || []));
-        }
+        const categorizedPdfs = validPdfs.reduce((acc, url) => {
+          const category = categorizePdf(url);
+          if (category === 'ridingLevels') acc.ridingLevels.push(url);
+          else acc.registration.push(url);
+          return acc;
+        }, { ridingLevels: [], registration: [] });
+        setRidingLevelsPdf(categorizedPdfs.ridingLevels);
+        setRegistrationPdf(categorizedPdfs.registration);
+        localStorage.setItem('ridingLevelsPdf', JSON.stringify(categorizedPdfs.ridingLevels));
+        localStorage.setItem('registrationPdf', JSON.stringify(categorizedPdfs.registration));
       }
     } catch (err) {
       console.error(err);
