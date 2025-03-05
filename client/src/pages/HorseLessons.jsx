@@ -16,29 +16,19 @@ function HorseLessons() {
   const [imageUrls, setImageUrls] = useState([]);
   const [ridingLevelsPdf, setRidingLevelsPdf] = useState(() => {
     const saved = localStorage.getItem('ridingLevelsPdf');
-    return saved ? JSON.parse(saved).map(url => 
-      process.env.NODE_ENV === 'development' ? url : url.replace(/^http:\/\/localhost:5000/, '')
-    ) : [];
+    return saved ? JSON.parse(saved) : [];
   });
   const [registrationPdf, setRegistrationPdf] = useState(() => {
     const saved = localStorage.getItem('registrationPdf');
-    return saved ? JSON.parse(saved).map(url => 
-      process.env.NODE_ENV === 'development' ? url : url.replace(/^http:\/\/localhost:5000/, '')
-    ) : [];
+    return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const cacheBuster = new Date().getTime();
-        const response = await fetch(`/api/images?page=horse-lessons&t=${cacheBuster}`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
-        const fullUrls = data.images.map(url => {
-          return url.startsWith('http') ? url : (process.env.NODE_ENV === 'development' ? `${baseUrl}${url}` : url);
-        });
-        setImageUrls(fullUrls || []);
+        const imageResponse = await fetch('/api/images?page=horse-lessons');
+        const imageData = await imageResponse.json();
+        setImageUrls(imageData.images || []);
       } catch (err) {
         // Error handled silently in production
       }
@@ -47,7 +37,9 @@ function HorseLessons() {
   }, []);
 
   const handleImageUpload = async (event) => {
-    if (!isAdmin) return;
+    if (!isAdmin) {
+      return;
+    }
 
     const files = event.target.files;
     if (!files.length) return;
@@ -67,17 +59,11 @@ function HorseLessons() {
         throw new Error(`Failed to upload image: ${errorText}`);
       }
       const uploadData = await uploadResponse.json();
-      const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
-      const cleanUrl = uploadData.url.startsWith('http') ? uploadData.url.replace(/^http:\/\/localhost:5000/, '') : uploadData.url;
-      const fullUrl = `${baseUrl}${cleanUrl}`;
 
       const updatedResponse = await fetch('/api/images?page=horse-lessons');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        const fullUrls = updatedData.images.map(url => {
-          return url.startsWith('http') ? url : (process.env.NODE_ENV === 'development' ? `${baseUrl}${url}` : url);
-        });
-        setImageUrls(fullUrls || []);
+        setImageUrls(updatedData.images || []);
       }
     } catch (err) {
       // Error handled silently in production
@@ -85,12 +71,14 @@ function HorseLessons() {
   };
 
   const handleImageDelete = async (urlToRemove) => {
-    if (!isAdmin) return;
+    if (!isAdmin) {
+      return;
+    }
 
     try {
       const deleteResponse = await fetchWithToken('/api/images', {
         method: 'DELETE',
-        headers: { 'Page': 'horse-lessons', 'Url': urlToRemove.replace(/^http:\/\/localhost:5000/, '') },
+        headers: { 'Page': 'horse-lessons', 'Url': urlToRemove },
       });
 
       if (!deleteResponse.ok) {
@@ -101,11 +89,7 @@ function HorseLessons() {
       const updatedResponse = await fetch('/api/images?page=horse-lessons');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
-        const fullUrls = updatedData.images.map(url => {
-          return url.startsWith('http') ? url : (process.env.NODE_ENV === 'development' ? `${baseUrl}${url}` : url);
-        });
-        setImageUrls(fullUrls || []);
+        setImageUrls(updatedData.images || []);
       }
     } catch (err) {
       // Error handled silently in production
@@ -123,54 +107,45 @@ function HorseLessons() {
   };
 
   const handlePdfUpload = (url, section) => {
-    if (!isAdmin) return;
-
-    const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
-    const cleanUrl = url.startsWith('http') ? url.replace(/^http:\/\/localhost:5000/, '') : url;
-    const fullUrl = `${baseUrl}${cleanUrl}`;
+    if (!isAdmin) {
+      return;
+    }
 
     if (section === 'ridingLevels') {
       setRidingLevelsPdf((prev) => {
-        const updated = [...prev, fullUrl];
-        localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated.map(u => 
-          process.env.NODE_ENV === 'development' ? u : u.replace(/^http:\/\/localhost:5000/, '')
-        )));
+        const updated = [...prev, url];
+        localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated));
         return updated;
       });
     } else if (section === 'registration') {
       setRegistrationPdf((prev) => {
-        const updated = [...prev, fullUrl];
-        localStorage.setItem('registrationPdf', JSON.stringify(updated.map(u => 
-          process.env.NODE_ENV === 'development' ? u : u.replace(/^http:\/\/localhost:5000/, '')
-        )));
+        const updated = [...prev, url];
+        localStorage.setItem('registrationPdf', JSON.stringify(updated));
         return updated;
       });
     }
   };
 
   const handlePdfRemove = async (urlToRemove, section) => {
-    if (!isAdmin) return;
+    if (!isAdmin) {
+      return;
+    }
 
-    const cleanUrl = urlToRemove.replace(/^http:\/\/localhost:5000/, '');
     const response = await fetchWithToken('/api/pdfs', {
       method: 'DELETE',
-      headers: { 'Page': 'horse-lessons', 'Url': cleanUrl },
+      headers: { 'Page': 'horse-lessons', 'Url': urlToRemove },
     });
     if (response.ok) {
       if (section === 'ridingLevels') {
         setRidingLevelsPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
-          localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated.map(u => 
-            process.env.NODE_ENV === 'development' ? u : u.replace(/^http:\/\/localhost:5000/, '')
-          )));
+          localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated));
           return updated;
         });
       } else if (section === 'registration') {
         setRegistrationPdf((prev) => {
           const updated = prev.filter((url) => url !== urlToRemove);
-          localStorage.setItem('registrationPdf', JSON.stringify(updated.map(u => 
-            process.env.NODE_ENV === 'development' ? u : u.replace(/^http:\/\/localhost:5000/, '')
-          )));
+          localStorage.setItem('registrationPdf', JSON.stringify(updated));
           return updated;
         });
       }
