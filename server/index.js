@@ -19,13 +19,6 @@ const getCleanFilename = (url) => {
   return filenameParts.join('-');
 };
 
-// Function to get the full URL for production
-const getFullUrl = (req, path) => {
-  const protocol = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers.host || 'mickelsen-family-farms.herokuapp.com';
-  return `${protocol}://${host}${path}`;
-};
-
 dotenv.config();
 
 // Handle service account key from Heroku config var
@@ -174,9 +167,7 @@ app.post('/api/images', authenticateToken, upload.single('image'), async (req, r
     } else {
       await HeroBackground.create({ url: url, urls: [url], pdfs: [], page });
     }
-    // Return full URL for production
-    const fullUrl = getFullUrl(req, url);
-    res.json({ url: fullUrl });
+    res.json({ url });
   } catch (err) {
     res.status(500).json({ error: 'Failed to upload image: ' + err.message });
   }
@@ -187,12 +178,10 @@ app.get('/api/images', async (req, res) => {
   try {
     const background = await HeroBackground.findOne({ page });
     const images = background ? (background.urls.length > 0 ? background.urls : [background.url || '']) : [];
-    // Transform to full URLs for production
-    const fullUrls = images.map(url => getFullUrl(req, url));
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
-    res.json({ images: fullUrls });
+    res.json({ images });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch images', details: err.message });
   }
@@ -248,9 +237,7 @@ app.post('/api/pdfs', authenticateToken, upload.single('pdf'), async (req, res) 
     } else {
       await HeroBackground.create({ url: '', urls: [], pdfs: [url], page });
     }
-    // Return full URL for production
-    const fullUrl = getFullUrl(req, url);
-    res.json({ url: fullUrl });
+    res.json({ url });
   } catch (err) {
     res.status(500).json({ error: 'Failed to upload PDF: ' + err.message });
   }
@@ -261,10 +248,8 @@ app.get('/api/pdfs', async (req, res) => {
   try {
     const background = await HeroBackground.findOne({ page });
     const pdfs = background ? background.pdfs : [];
-    // Transform to full URLs for production
-    const fullUrls = pdfs.map(url => getFullUrl(req, url));
-    const cleanFilenames = fullUrls.map(pdfUrl => getCleanFilename(pdfUrl));
-    res.json({ pdfs: fullUrls, filenames: cleanFilenames });
+    const cleanFilenames = pdfs.map(pdfUrl => getCleanFilename(pdfUrl));
+    res.json({ pdfs, filenames: cleanFilenames });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch PDFs' });
   }
@@ -302,9 +287,7 @@ app.get('/api/hero-background', async (req, res) => {
   try {
     const background = await HeroBackground.findOne({ page: 'default' });
     const url = background ? (background.urls[0] || background.url || '/path-to-farm-image.jpg') : '/path-to-farm-image.jpg';
-    // Transform to full URL for production
-    const fullUrl = getFullUrl(req, url);
-    res.json({ url: fullUrl });
+    res.json({ url });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch hero background' });
   }
@@ -324,9 +307,7 @@ app.post('/api/hero-background', async (req, res) => {
       { $set: { urls: [url], url: url } },
       { upsert: true, new: true }
     );
-    // Return full URL for production
-    const fullUrl = getFullUrl(req, url);
-    res.json({ url: fullUrl });
+    res.json({ url });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update hero background' });
   }
