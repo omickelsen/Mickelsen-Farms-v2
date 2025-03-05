@@ -26,9 +26,15 @@ function HorseLessons() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const imageResponse = await fetch('/api/images?page=horse-lessons');
-        const imageData = await imageResponse.json();
-        setImageUrls(imageData.images || []);
+        const cacheBuster = new Date().getTime();
+        const response = await fetch(`/api/images?page=horse-lessons&t=${cacheBuster}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+        const fullUrls = data.images.map(url => {
+          return url.startsWith('http') ? url : (process.env.NODE_ENV === 'development' ? `${baseUrl}${url}` : url);
+        });
+        setImageUrls(fullUrls || []);
       } catch (err) {
         // Error handled silently in production
       }
@@ -63,7 +69,11 @@ function HorseLessons() {
       const updatedResponse = await fetch('/api/images?page=horse-lessons');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        setImageUrls(updatedData.images || []);
+        const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+        const fullUrls = updatedData.images.map(url => {
+          return url.startsWith('http') ? url : (process.env.NODE_ENV === 'development' ? `${baseUrl}${url}` : url);
+        });
+        setImageUrls(fullUrls || []);
       }
     } catch (err) {
       // Error handled silently in production
@@ -89,7 +99,11 @@ function HorseLessons() {
       const updatedResponse = await fetch('/api/images?page=horse-lessons');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        setImageUrls(updatedData.images || []);
+        const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+        const fullUrls = updatedData.images.map(url => {
+          return url.startsWith('http') ? url : (process.env.NODE_ENV === 'development' ? `${baseUrl}${url}` : url);
+        });
+        setImageUrls(fullUrls || []);
       }
     } catch (err) {
       // Error handled silently in production
@@ -111,15 +125,19 @@ function HorseLessons() {
       return;
     }
 
+    const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+    const cleanUrl = url.startsWith('http') ? url.replace(/^http:\/\/localhost:5000/, '') : url;
+    const fullUrl = `${baseUrl}${cleanUrl}`;
+
     if (section === 'ridingLevels') {
       setRidingLevelsPdf((prev) => {
-        const updated = [...prev, url];
+        const updated = [...prev, fullUrl];
         localStorage.setItem('ridingLevelsPdf', JSON.stringify(updated));
         return updated;
       });
     } else if (section === 'registration') {
       setRegistrationPdf((prev) => {
-        const updated = [...prev, url];
+        const updated = [...prev, fullUrl];
         localStorage.setItem('registrationPdf', JSON.stringify(updated));
         return updated;
       });
