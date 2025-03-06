@@ -68,23 +68,24 @@ export const AuthProvider = ({ children }) => {
 export const fetchWithToken = async (url, options = {}) => {
   const jwtToken = localStorage.getItem('jwtToken');
   let baseUrl;
+  const validProductionHosts = [
+    'mickelsen-family-farms.herokuapp.com',
+    'mickelsenfamilyfarms.com',
+    'www.mickelsenfamilyfarms.com',
+  ];
+
   if (typeof window !== 'undefined') {
     const host = window.location.host;
-    // Prioritize Heroku URL if the host isn't the custom domain
-    if (host.includes('herokuapp.com')) {
+    // Check if the current host is a valid production host
+    if (validProductionHosts.includes(host)) {
       baseUrl = `${window.location.protocol}//${host}`;
     } else {
-      // Try custom domain, fall back to Heroku if it fails
-      baseUrl = `${window.location.protocol}//${host}`;
-      try {
-        await fetch(`${baseUrl}/health`);
-      } catch (err) {
-        console.warn('Custom domain failed, falling back to Heroku URL:', err.message);
-        baseUrl = 'https://mickelsen-family-farms.herokuapp.com';
-      }
+      // Fallback to Heroku URL if the host isn’t recognized
+      baseUrl = 'https://mickelsen-family-farms.herokuapp.com';
+      console.warn('Unrecognized host, falling back to Heroku URL:', host);
     }
   } else if (process.env.NODE_ENV === 'production') {
-    baseUrl = 'https://mickelsen-family-farms.herokuapp.com'; // Fallback for server-side rendering
+    baseUrl = 'https://mickelsen-family-farms.herokuapp.com'; // Default production fallback
   } else {
     baseUrl = 'http://localhost:5000'; // Local development
   }

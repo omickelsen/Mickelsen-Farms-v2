@@ -12,10 +12,7 @@ const CarouselComponent = ({
   const [error, setError] = useState(null);
   const [deletingImage, setDeletingImage] = useState(null);
 
-  // Define baseUrl at the component level
-  const baseUrl = process.env.NODE_ENV === 'production'
-    ? 'https://mickelsen-family-farms.herokuapp.com'
-    : 'http://localhost:5000';
+  
 
   useEffect(() => {
     const fetchImages = async () => {

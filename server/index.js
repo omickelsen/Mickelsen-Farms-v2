@@ -29,7 +29,7 @@ app.use(express.json());
 
 // Enhanced CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? 'https://mickelsenfamilyfarms.com' : 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' ? ['https://mickelsen-family-farms.herokuapp.com', 'https://mickelsenfamilyfarms.com', 'https://www.mickelsenfamilyfarms.com'] : 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Page', 'Url'],
