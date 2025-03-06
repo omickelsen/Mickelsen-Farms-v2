@@ -67,14 +67,26 @@ export const AuthProvider = ({ children }) => {
 
 export const fetchWithToken = async (url, options = {}) => {
   const jwtToken = localStorage.getItem('jwtToken');
-  // Determine base URL dynamically
   let baseUrl;
   if (typeof window !== 'undefined') {
-    baseUrl = `${window.location.protocol}//${window.location.host}`;
+    const host = window.location.host;
+    // Prioritize Heroku URL if the host isn't the custom domain
+    if (host.includes('herokuapp.com')) {
+      baseUrl = `${window.location.protocol}//${host}`;
+    } else {
+      // Try custom domain, fall back to Heroku if it fails
+      baseUrl = `${window.location.protocol}//${host}`;
+      try {
+        await fetch(`${baseUrl}/health`);
+      } catch (err) {
+        console.warn('Custom domain failed, falling back to Heroku URL:', err.message);
+        baseUrl = 'https://mickelsen-family-farms.herokuapp.com';
+      }
+    }
   } else if (process.env.NODE_ENV === 'production') {
-    baseUrl = 'https://mickelsenfamilyfarms.com'; // Fallback to custom domain
+    baseUrl = 'https://mickelsen-family-farms.herokuapp.com'; // Fallback for server-side rendering
   } else {
-    baseUrl = 'http://localhost:5000'; // Fallback for server-side rendering or local dev
+    baseUrl = 'http://localhost:5000'; // Local development
   }
 
   const headers = {
@@ -88,7 +100,8 @@ export const fetchWithToken = async (url, options = {}) => {
     throw new Error(`Invalid URL: ${url}`);
   }
 
-  const finalUrl = url.startsWith('http') ? url : `${baseUrl}${url.replace(/^\//, '')}`;
+  // Ensure a slash is added between baseUrl and url if needed
+  const finalUrl = url.startsWith('http') ? url : `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}${url.replace(/^\//, '')}`;
   console.log('Fetching from:', finalUrl); // Debug log
 
   try {
