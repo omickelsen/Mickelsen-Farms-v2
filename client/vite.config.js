@@ -33,6 +33,7 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     // Build configuration (applies to production)
+    envDir: './env', 
     build: {
       outDir: 'dist', // Matches server/index.js
       assetsDir: 'assets',

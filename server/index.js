@@ -6,14 +6,16 @@ const dotenv = require('dotenv');
 const authRouter = require('./routes/auth');
 const calendarRouter = require('./routes/calendar');
 const contentRouter = require('./routes/content');
-const assetsRouter = require('./routes/assets'); // Updated route file
+const assetsRouter = require('./routes/assets');
 const { calendarClient } = require('./config/googleCalendar');
 const path = require('path');
 const fs = require('fs');
 const Content = require('./models/Content');
 const jwt = require('jsonwebtoken');
 
-dotenv.config();
+// Load environment variables from root .env
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+console.log('NODE_ENV:', process.env.NODE_ENV);
 
 // Handle service account key from Heroku config var
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
@@ -27,7 +29,7 @@ app.use(express.json());
 
 // Enhanced CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? 'https://mickelsen-family-farms.herokuapp.com' : 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' ? 'https://mickelsenfamilyfarms.com' : 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Page', 'Url'],
@@ -64,19 +66,19 @@ app.use('/uploads', (req, res, next) => {
   console.log('Serving file:', filePath);
   if (fs.existsSync(filePath) && filePath.endsWith('.pdf')) {
     res.set('Content-Type', 'application/pdf');
-    const filename = req.path.split('/').pop(); // Default to generated filename
+    const filename = req.path.split('/').pop();
     res.set('Content-Disposition', `attachment; filename="${filename}"`);
   }
   express.static(path.join(__dirname, 'uploads'))(req, res, next);
 });
 
-// Add a health check endpoint
+// Health check endpoint
 app.get('/health', (req, res) => {
   console.log('Health check endpoint hit');
   res.send('Server is healthy');
 });
 
-// Public GET endpoints
+// Public GET endpoint
 app.get('/api/content', async (req, res) => {
   console.log('Fetching content for all pages');
   try {
@@ -90,14 +92,13 @@ app.get('/api/content', async (req, res) => {
 
 // Mount routers
 app.use('/api/content', contentRouter);
-app.use('/api/assets', assetsRouter); // Updated mount point
-
+app.use('/api/assets', assetsRouter);
 app.use('/auth', authRouter);
 app.use('/api/calendar', calendarRouter);
 
-// Add token verification endpoint to match AuthContext.jsx
+// Token verification endpoint
 app.get('/api/verify-token', authenticateToken, (req, res) => {
-  console.log('Verifying token for:', req.user.email);
+  console.log('Verifying token for:', req.user?.email);
   if (req.user && req.isAdmin !== undefined) {
     res.json({ email: req.user.email, isAdmin: req.isAdmin });
   } else {
@@ -105,15 +106,31 @@ app.get('/api/verify-token', authenticateToken, (req, res) => {
   }
 });
 
-// Serve React build in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/dist')));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      next();
+// Serve React build
+const clientDistPath = path.join(__dirname, '../client/dist');
+console.log('Checking client dist path:', clientDistPath);
+if (fs.existsSync(clientDistPath)) {
+  console.log('Client dist directory found. Serving static files from:', clientDistPath);
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res) => {
+    console.log('Attempting to serve index.html for route:', req.url);
+    const indexPath = path.join(clientDistPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error('Error serving index.html:', err);
+          res.status(500).send('Server Error: Failed to serve index.html');
+        }
+      });
     } else {
-      res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
+      console.error('index.html not found at:', indexPath);
+      res.status(404).send('Not Found - index.html missing in client/dist');
     }
+  });
+} else {
+  console.warn('Client dist directory not found at:', clientDistPath);
+  app.get('*', (req, res) => {
+    res.status(404).send('Not Found - Please build the client app with "NODE_ENV=production npm run build" in the client directory.');
   });
 }
 

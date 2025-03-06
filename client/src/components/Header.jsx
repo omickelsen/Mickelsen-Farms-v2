@@ -33,8 +33,10 @@ const Header = () => {
 
   const handleLoginClick = (e) => {
     e.preventDefault(); // Prevent page refresh
-    window.location.href = 'http://localhost:5000/auth/google'; // Use absolute URL for testing
-    // For production, use the Heroku URL or adjust based on environment
+    const backendUrl = process.env.NODE_ENV === 'production'
+      ? 'https://mickelsen-family-farms.herokuapp.com'
+      : 'http://localhost:5000';
+    window.location.href = `${backendUrl}/auth/google`;
   };
 
   const handleLogout = () => {

@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const { OAuth2Client } = require('google-auth-library');
 
-dotenv.config();
+dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 
 const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -28,15 +28,13 @@ router.get('/google', (req, res) => {
 
 // Callback route to handle Google response
 router.get('/google/callback', async (req, res) => {
-  console.log('Callback received with query:', req.query);
   const code = req.query.code;
-  const redirectUri = process.env.NODE_ENV === 'production'
-    ? 'https://mickelsen-family-farms.herokuapp.com/auth/google/callback'
-    : 'http://localhost:5000/auth/google/callback';
   try {
     const { tokens } = await oauth2Client.getToken({
-      code: code,
-      redirect_uri: redirectUri,
+      code,
+      redirect_uri: process.env.NODE_ENV === 'production'
+        ? 'https://mickelsen-family-farms.herokuapp.com/auth/google/callback'
+        : 'http://localhost:5000/auth/google/callback',
     });
     oauth2Client.setCredentials(tokens);
 
@@ -48,17 +46,19 @@ router.get('/google/callback', async (req, res) => {
     const userEmail = payload.email;
     const isAdmin = ADMIN_EMAILS.includes(userEmail);
 
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is not set in environment variables');
+    }
     const token = jwt.sign({ email: userEmail, isAdmin }, process.env.JWT_SECRET, { expiresIn: '1h' });
     console.log('Generated JWT:', token);
 
-    // Redirect with token in URL
-    const frontendRedirect = process.env.NODE_ENV === 'production'
-      ? 'https://mickelsen-family-farms.herokuapp.com/auth/success'
-      : 'http://localhost:3000/auth/success';
-    res.redirect(`${frontendRedirect}?token=${encodeURIComponent(token)}`);
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? 'https://mickelsen-family-farms.herokuapp.com'
+      : 'http://localhost:3000';
+    res.redirect(`${baseUrl}/auth/success?token=${encodeURIComponent(token)}`);
   } catch (err) {
-    console.error('Error in Google callback:', err);
-    res.status(500).send('Authentication failed');
+    console.error('Error in Google callback:', err.message);
+    res.status(500).send('Authentication failed: ' + err.message);
   }
 });
 
