@@ -26,7 +26,7 @@ function HorseLessons() {
   const [error, setError] = useState(null);
   const [deletingImage, setDeletingImage] = useState(null);
 
-  // Define baseUrl at the component level
+  // Define baseUrl at the component level (needed for PDFs, not images)
   const baseUrl = process.env.NODE_ENV === 'production'
     ? 'https://mickelsen-family-farms.herokuapp.com'
     : 'http://localhost:5000';
@@ -35,15 +35,13 @@ function HorseLessons() {
     const fetchData = async () => {
       try {
         const cacheBuster = new Date().getTime();
-        // Fetch images with baseUrl
-        const imageResponse = await fetch(`${baseUrl}/api/assets/images?page=horse-lessons&t=${cacheBuster}`);
+        // Fetch images with baseUrl (but use S3 URLs directly)
+        const imageResponse = await fetch(`/api/assets/images?page=horse-lessons&t=${cacheBuster}`);
         if (!imageResponse.ok) {
           throw new Error(`Failed to fetch images: ${imageResponse.status} ${await imageResponse.text()}`);
         }
         const imageData = await imageResponse.json();
-        
-        const fullImageUrls = imageData.images.map(url => `${baseUrl}${url}`);
-        setImageUrls(fullImageUrls);
+        setImageUrls(imageData.images || []); // Use S3 URLs directly
 
         // Fetch PDFs with baseUrl
         const pdfResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=horse-lessons&t=${cacheBuster}`);
@@ -84,7 +82,7 @@ function HorseLessons() {
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append('image', file));
     try {
-      const uploadResponse = await fetchWithToken(`${baseUrl}/api/assets/images`, {
+      const uploadResponse = await fetchWithToken('/api/assets/images', {
         method: 'POST',
         body: formData,
         headers: { 'Page': 'horse-lessons' },
@@ -93,13 +91,12 @@ function HorseLessons() {
         const errorText = await uploadResponse.text();
         throw new Error(`Image upload failed: ${errorText}`);
       }
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=horse-lessons`);
+      const updatedResponse = await fetch('/api/assets/images?page=horse-lessons');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         console.log('Updated images after upload:', updatedData);
-        const fullImageUrls = updatedData.images.map(url => `${baseUrl}${url}`);
-        setImageUrls(fullImageUrls);
-        localStorage.setItem('imageUrls', JSON.stringify(updatedData.images));
+        setImageUrls(updatedData.images || []); // Use S3 URLs directly
+        localStorage.setItem('horseLessons_imageUrls', JSON.stringify(updatedData.images));
       }
     } catch (err) {
       console.error('Image upload error:', err);
@@ -110,27 +107,25 @@ function HorseLessons() {
   const handleImageDelete = async (urlToRemove) => {
     if (!isAdmin) return;
     setDeletingImage(urlToRemove);
-    const relativeUrl = urlToRemove.startsWith(baseUrl) ? urlToRemove.replace(baseUrl, '') : urlToRemove;
     try {
-      const deleteResponse = await fetchWithToken(`${baseUrl}/api/assets/images`, {
+      const deleteResponse = await fetchWithToken('/api/assets/images', {
         method: 'DELETE',
-        headers: { 'Page': 'horse-lessons', 'Url': relativeUrl },
+        headers: { 'Page': 'horse-lessons', 'Url': urlToRemove }, // Send full S3 URL
       });
       if (!deleteResponse.ok && deleteResponse.status !== 404) {
         const errorText = await deleteResponse.text();
         throw new Error(`Image delete failed: ${errorText}`);
       }
-      console.warn(`Image not found on server, proceeding to refresh list: ${relativeUrl}`);
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=horse-lessons`);
+      console.warn(`Image not found on server, proceeding to refresh list: ${urlToRemove}`);
+      const updatedResponse = await fetch('/api/assets/images?page=horse-lessons');
       if (!updatedResponse.ok) {
         const errorText = await updatedResponse.text();
         throw new Error(`Failed to fetch updated images after delete: ${errorText}`);
       }
       const updatedData = await updatedResponse.json();
       console.log('Updated images after delete:', updatedData);
-      const fullImageUrls = updatedData.images.map(url => `${baseUrl}${url}`);
-      setImageUrls(fullImageUrls);
-      localStorage.setItem('imageUrls', JSON.stringify(updatedData.images));
+      setImageUrls(updatedData.images || []);
+      localStorage.setItem('horseLessons_imageUrls', JSON.stringify(updatedData.images));
       setError(null);
     } catch (err) {
       console.error('Image delete error:', err);
@@ -211,6 +206,11 @@ function HorseLessons() {
   const openModal = (url) => setSelectedImage(url);
   const closeModal = () => setSelectedImage(null);
 
+  const handleImageError = (url) => {
+    console.error(`Failed to load image: ${url}`);
+    setImageUrls((prev) => prev.filter((u) => u !== url));
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen">
       <Header />
@@ -276,11 +276,11 @@ function HorseLessons() {
                   imageUrls.map((url, index) => (
                     <div key={index} className="relative">
                       <img
-                        src={url}
+                        src={url} // Use S3 URL directly
                         alt={`Horse Lessons ${index + 1}`}
                         className="w-full h-48 object-cover rounded-lg cursor-pointer"
                         onClick={() => openModal(url)}
-                        onError={() => console.error(`Failed to load image: ${url}`)}
+                        onError={() => handleImageError(url)}
                       />
                       {isAdmin && (
                         <button

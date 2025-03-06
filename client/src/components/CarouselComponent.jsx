@@ -12,24 +12,19 @@ const CarouselComponent = ({
   const [error, setError] = useState(null);
   const [deletingImage, setDeletingImage] = useState(null);
 
-  // Define baseUrl at the component level
-  const baseUrl = process.env.NODE_ENV === 'production'
-    ? 'https://mickelsen-family-farms.herokuapp.com'
-    : 'http://localhost:5000';
-
   useEffect(() => {
     const fetchImages = async () => {
       try {
         const cacheBuster = new Date().getTime();
-        const response = await fetch(`${baseUrl}/api/assets/images?page=carousel&t=${cacheBuster}`);
+        const response = await fetch(`/api/assets/images?page=carousel&t=${cacheBuster}`);
         if (!response.ok && response.status !== 304) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         
-        const fullUrls = Array.isArray(data.images) ? data.images.map(url => `${baseUrl}${url}`) : [];
+        // Use S3 URLs directly
         setOriginalImages(data.images || []);
-        setImages(fullUrls);
+        setImages(data.images || []);
         setError(null);
       } catch (err) {
         console.error('Error fetching carousel images:', err);
@@ -41,7 +36,7 @@ const CarouselComponent = ({
 
     // Fetch images whenever isAdmin or token changes (e.g., after login)
     fetchImages();
-  }, [baseUrl, isAdmin, token]);
+  }, [isAdmin, token]);
 
   useEffect(() => {
     if (images.length === 0) return;
@@ -73,7 +68,7 @@ const CarouselComponent = ({
 
     try {
       const uploadResponse = await fetchWithToken(
-        `${baseUrl}/api/assets/images`,
+        '/api/assets/images',
         {
           method: 'POST',
           body: formData,
@@ -86,13 +81,13 @@ const CarouselComponent = ({
         throw new Error(`Failed to upload image: ${errorText}`);
       }
 
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=carousel`);
+      const updatedResponse = await fetch('/api/assets/images?page=carousel');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         console.log('Updated images after upload:', updatedData);
-        const fullImageUrls = Array.isArray(updatedData.images) ? updatedData.images.map(url => `${baseUrl}${url}`) : [];
+        // Use S3 URLs directly
         setOriginalImages(updatedData.images || []);
-        setImages(fullImageUrls);
+        setImages(updatedData.images || []);
       } else {
         throw new Error('Failed to update carousel images.');
       }
@@ -109,17 +104,16 @@ const CarouselComponent = ({
     }
 
     setDeletingImage(index);
-    const urlToRemove = images[index];
-    const originalUrl = originalImages[index] || urlToRemove.replace(`${baseUrl}`, '');
+    const urlToRemove = images[index]; // Use the full S3 URL
 
     try {
       const response = await fetchWithToken(
-        `${baseUrl}/api/assets/images`,
+        '/api/assets/images',
         {
           method: 'DELETE',
           headers: {
             'Page': 'carousel',
-            'Url': originalUrl,
+            'Url': urlToRemove, // Send the full S3 URL
           },
         }
       );
@@ -128,14 +122,14 @@ const CarouselComponent = ({
         throw new Error('Delete failed');
       }
 
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=carousel`);
+      const updatedResponse = await fetch('/api/assets/images?page=carousel');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         console.log('Updated images after delete:', updatedData);
-        const fullImageUrls = Array.isArray(updatedData.images) ? updatedData.images.map(url => `${baseUrl}${url}`) : [];
+        // Use S3 URLs directly
         setOriginalImages(updatedData.images || []);
-        setImages(fullImageUrls);
-        if (currentImageIndex >= fullImageUrls.length) {
+        setImages(updatedData.images || []);
+        if (currentImageIndex >= updatedData.images.length) {
           setCurrentImageIndex(0);
         }
         setError(null);

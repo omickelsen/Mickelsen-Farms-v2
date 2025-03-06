@@ -9,23 +9,18 @@ const HeroSection = () => {
   const [success, setSuccess] = useState(null);
   const [deletingImage, setDeletingImage] = useState(null);
 
-  // Define baseUrl at the component level
-  const baseUrl = process.env.NODE_ENV === 'production'
-    ? 'https://mickelsen-family-farms.herokuapp.com'
-    : 'http://localhost:5000';
-
   useEffect(() => {
     const fetchHeroBackground = async () => {
       try {
         const cacheBuster = new Date().getTime();
-        const response = await fetch(`${baseUrl}/api/assets/images?page=default&t=${cacheBuster}`);
+        const response = await fetch(`/api/assets/images?page=default&t=${cacheBuster}`);
         if (!response.ok) {
           throw new Error(`Failed to fetch hero background: ${response.status} ${await response.text()}`);
         }
         const data = await response.json();
-        const fullImageUrls = Array.isArray(data.images) ? data.images.map(url => `${baseUrl}${url}`) : [];
-        setImages(fullImageUrls);
-        setBackgroundImage(fullImageUrls[0] || '/path-to-farm-image.jpg');
+        // Use S3 URLs directly without prepending baseUrl
+        setImages(data.images || []);
+        setBackgroundImage(data.images[0] || '/path-to-farm-image.jpg');
         setError(null);
       } catch (err) {
         console.error('Error fetching hero background:', err);
@@ -35,7 +30,7 @@ const HeroSection = () => {
     };
 
     fetchHeroBackground();
-  }, [baseUrl, isAdmin, token]);
+  }, [isAdmin, token]);
 
   const handleImageUpload = async (event) => {
     if (!isAdmin) {
@@ -51,7 +46,7 @@ const HeroSection = () => {
 
     try {
       const uploadResponse = await fetchWithToken(
-        `${baseUrl}/api/assets/images`,
+        '/api/assets/images',
         {
           method: 'POST',
           body: formData,
@@ -64,13 +59,13 @@ const HeroSection = () => {
         throw new Error(`Failed to upload image: ${errorText}`);
       }
 
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=default`);
+      const updatedResponse = await fetch('/api/assets/images?page=default');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        
-        const fullImageUrls = Array.isArray(updatedData.images) ? updatedData.images.map(url => `${baseUrl}${url}`) : [];
-        setImages(fullImageUrls);
-        setBackgroundImage(fullImageUrls[0] || '/path-to-farm-image.jpg');
+        console.log('Updated images after upload:', updatedData);
+        // Use S3 URLs directly without prepending baseUrl
+        setImages(updatedData.images || []);
+        setBackgroundImage(updatedData.images[0] || '/path-to-farm-image.jpg');
         setSuccess('Background image updated successfully!');
       } else {
         throw new Error('Failed to update background image.');
@@ -88,24 +83,26 @@ const HeroSection = () => {
     }
 
     setDeletingImage(urlToRemove);
-    const relativeUrl = urlToRemove.startsWith(baseUrl) ? urlToRemove.replace(baseUrl, '') : urlToRemove;
 
     try {
-      const deleteResponse = await fetchWithToken(
-        `${baseUrl}/api/assets/images`,
+      const response = await fetchWithToken(
+        '/api/assets/images',
         {
           method: 'DELETE',
-          headers: { 'Page': 'default', 'Url': relativeUrl },
+          headers: {
+            'Page': 'default',
+            'Url': urlToRemove, // Send the full S3 URL
+          },
         }
       );
 
-      if (!deleteResponse.ok && deleteResponse.status !== 404) {
-        const errorText = await deleteResponse.text();
+      if (!response.ok && response.status !== 404) {
+        const errorText = await response.text();
         throw new Error(`Failed to delete image: ${errorText}`);
       }
 
-      console.warn(`Image not found on server, proceeding to refresh list: ${relativeUrl}`);
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=default`);
+      console.warn(`Image not found on server, proceeding to refresh list: ${urlToRemove}`);
+      const updatedResponse = await fetch('/api/assets/images?page=default');
       if (!updatedResponse.ok) {
         const errorText = await updatedResponse.text();
         throw new Error(`Failed to fetch updated images after delete: ${errorText}`);
@@ -113,9 +110,9 @@ const HeroSection = () => {
 
       const updatedData = await updatedResponse.json();
       console.log('Updated images after delete:', updatedData);
-      const fullImageUrls = Array.isArray(updatedData.images) ? updatedData.images.map(url => `${baseUrl}${url}`) : [];
-      setImages(fullImageUrls);
-      setBackgroundImage(fullImageUrls[0] || '/path-to-farm-image.jpg');
+      // Use S3 URLs directly without prepending baseUrl
+      setImages(updatedData.images || []);
+      setBackgroundImage(updatedData.images[0] || '/path-to-farm-image.jpg');
       setSuccess('Image deleted successfully!');
       setError(null);
     } catch (err) {

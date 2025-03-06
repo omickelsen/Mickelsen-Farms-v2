@@ -8,8 +8,10 @@ const ImageUpload = ({ onUpload, page }) => {
   const onDrop = useCallback(
     async (acceptedFiles) => {
       if (!isAdmin) {
+        console.log('Upload prevented: Not an admin');
         return;
       }
+
       const formData = new FormData();
       acceptedFiles.forEach((file) => formData.append('image', file));
 
@@ -17,18 +19,36 @@ const ImageUpload = ({ onUpload, page }) => {
         const response = await fetchWithToken('/api/assets/images', {
           method: 'POST',
           body: formData,
-          headers: { 'Page': page || 'default' },
+          headers: {
+            'Page': page || 'default',
+          },
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to upload image: ${errorText} (Status: ${response.status})`);
+        }
+
         const data = await response.json();
-        if (onUpload) onUpload(data.url);
+        console.log('Image upload successful, response:', data);
+        if (onUpload && data.url) {
+          onUpload(data.url); // Pass the full S3 URL to onUpload
+        } else {
+          throw new Error('No URL returned from server');
+        }
       } catch (err) {
-        // Error handled silently in production
+        console.error('Image upload error:', err.message);
+        alert(`Image upload failed: ${err.message}`); // Notify user of failure
       }
     },
     [token, isAdmin, onUpload, page]
   );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: 'image/*', // Restrict to image files
+    multiple: true,   // Allow multiple image uploads
+  });
 
   return isAdmin ? (
     <div
