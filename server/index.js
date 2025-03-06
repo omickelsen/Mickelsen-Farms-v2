@@ -1,4 +1,3 @@
-console.log('Starting server...');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -14,25 +13,22 @@ const Content = require('./models/Content');
 const jwt = require('jsonwebtoken');
 
 // Load environment variables from root .env
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 console.log('NODE_ENV:', process.env.NODE_ENV);
-
-// Handle service account key from Heroku config var
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-  const tempKeyPath = path.join(__dirname, 'temp-service-account-key.json');
-  fs.writeFileSync(tempKeyPath, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = tempKeyPath;
-}
+console.log('CALENDAR_ID:', process.env.CALENDAR_ID);
+console.log('GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY);
 
 const app = express();
 app.use(express.json());
 
 // Enhanced CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? ['https://mickelsen-family-farms.herokuapp.com', 'https://mickelsenfamilyfarms.com', 'https://www.mickelsenfamilyfarms.com'] : 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://mickelsen-family-farms.herokuapp.com', 'https://mickelsenfamilyfarms.com', 'https://www.mickelsenfamilyfarms.com']
+    : 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Page', 'Url'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Page', 'Url', 'Section'],
   optionsSuccessStatus: 200,
 }));
 
@@ -60,17 +56,20 @@ const authenticateToken = async (req, res, next) => {
   next();
 };
 
-// Serve uploaded files statically
-app.use('/uploads', (req, res, next) => {
-  const filePath = path.join(__dirname, 'uploads', req.path);
-  console.log('Serving file:', filePath);
-  if (fs.existsSync(filePath) && filePath.endsWith('.pdf')) {
-    res.set('Content-Type', 'application/pdf');
-    const filename = req.path.split('/').pop();
-    res.set('Content-Disposition', `attachment; filename="${filename}"`);
-  }
-  express.static(path.join(__dirname, 'uploads'))(req, res, next);
-});
+// Serve uploaded files statically with debugging
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    const ext = path.extname(filePath).toLowerCase();
+    console.log('Serving file:', filePath);
+    if (ext === '.pdf') {
+      res.set('Content-Type', 'application/pdf');
+      const filename = path.basename(filePath);
+      res.set('Content-Disposition', `attachment; filename="${filename}"`);
+    } else if (['.jpg', '.jpeg', '.png'].includes(ext)) {
+      res.set('Content-Type', `image/${ext.replace('.', '')}`);
+    }
+  },
+}));
 
 // Health check endpoint
 app.get('/health', (req, res) => {

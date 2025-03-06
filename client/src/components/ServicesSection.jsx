@@ -22,6 +22,11 @@ const ServicesSection = () => {
       description: 'Clinics, open houses, and seasonal celebrations.',
       link: '/events',
     },
+    {
+      title: 'Wild Wasatch Ice Fishing',
+      description: 'Ice Fishing Guide Service provided by our Wild Wasatch team.',
+      link: 'https://wildwasatch.com/',
+    },
   ];
 
   return (

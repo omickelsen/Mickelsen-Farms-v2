@@ -11,7 +11,7 @@ const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_SECRET
 );
 
-const ADMIN_EMAILS = ['omickelsen@gmail.com', 'mickelsenfamilyfarms@gmail.com'];
+const ADMIN_EMAILS = ['omickelsen@gmail.com', 'mickelsenfamilyfarms@gmail.com', 'nikmickelsen@gmail.com'];
 
 // Redirect to Google for authentication
 router.get('/google', (req, res) => {

@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
 
-const PdfUpload = ({ onUpload, page }) => {
+const PdfUpload = ({ onUpload, page, section }) => {
   const { token, isAdmin } = useAuth();
 
   const onDrop = useCallback(
@@ -26,7 +26,10 @@ const PdfUpload = ({ onUpload, page }) => {
         const response = await fetchWithToken(`${baseUrl}/api/assets/pdfs`, {
           method: 'POST',
           body: formData,
-          headers: { 'Page': page },
+          headers: { 
+            'Page': page,
+            'Section': section // Pass section in headers
+          },
         });
         if (!response.ok) {
           const errorText = await response.text();
@@ -34,14 +37,13 @@ const PdfUpload = ({ onUpload, page }) => {
         }
         const data = await response.json();
         console.log('PDF upload successful, response:', data);
-        if (onUpload) onUpload(data.url);
+        if (onUpload) onUpload(data.url, data.section); // Use section from response
       } catch (err) {
         console.error('PDF upload error:', err.message);
-        // Optionally notify the user in the UI
         alert(`PDF upload failed: ${err.message}`);
       }
     },
-    [token, isAdmin, onUpload, page]
+    [token, isAdmin, onUpload, page, section]
   );
 
   return isAdmin ? (

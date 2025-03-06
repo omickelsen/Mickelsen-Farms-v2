@@ -66,7 +66,7 @@ function Home() {
         </div>
       </section>
 
-      <section className="py-10 md:py-16 bg-gray-100">
+      {/* <section className="py-10 md:py-16 bg-gray-100">
         <div className="container">
           <h3 className="text-2xl font-bold text-center mb-4">Submit a Request</h3>
           <form onSubmit={handleRequestSubmit} className="max-w-md mx-auto">
@@ -82,7 +82,7 @@ function Home() {
             {message && <p className="mt-2 text-gray-700">{message}</p>}
           </form>
         </div>
-      </section>
+      </section> */}
     </div>
   );
 }

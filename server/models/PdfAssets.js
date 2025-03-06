@@ -1,3 +1,4 @@
+// server/models/PdfAssets.js
 const mongoose = require('mongoose');
 
 const pdfAssetSchema = new mongoose.Schema({
@@ -5,7 +6,8 @@ const pdfAssetSchema = new mongoose.Schema({
   pdfs: [
     {
       url: { type: String, required: true },
-      originalName: { type: String, required: true } // Store the original filename
+      originalName: { type: String, required: true }, // Store the original filename
+      section: { type: String, required: true } // Add section field
     }
   ]
 });

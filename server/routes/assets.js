@@ -154,7 +154,6 @@ router.delete('/images', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'ImageAsset not found' });
     }
 
-    // Delete the physical file from the uploads folder
     const fileName = urlToRemove.split('/').pop();
     const filePath = path.join(__dirname, '../uploads', fileName);
     if (fs.existsSync(filePath)) {
@@ -219,7 +218,7 @@ router.get('/pdfs', async (req, res) => {
   try {
     const pdfAsset = await PdfAssets.findOne({ page });
     console.log('Found PdfAssets document:', pdfAsset);
-    const pdfs = pdfAsset ? pdfAsset.pdfs.map(p => ({ url: p.url, originalName: p.originalName || getCleanFilename(p.url) })) : [];
+    const pdfs = pdfAsset ? pdfAsset.pdfs.map(p => ({ url: p.url, originalName: p.originalName || getCleanFilename(p.url), section: p.section })) : [];
     const cleanFilenames = pdfs.map(p => p.originalName);
     console.log('Returning PDFs:', pdfs, 'Filenames:', cleanFilenames);
     res.json({ pdfs, filenames: cleanFilenames });
@@ -239,24 +238,25 @@ router.post('/pdfs', authenticateToken, upload.single('pdf'), async (req, res) =
     return res.status(400).json({ error: 'No valid PDF provided' });
   }
   const url = `/uploads/${req.file.filename}`;
-  const originalName = req.file.originalname; // Store the original filename
+  const originalName = req.file.originalname;
   const page = req.headers.page || 'default';
-  console.log('Uploading PDF for page:', page, 'URL:', url, 'Original Name:', originalName);
+  const section = req.headers.section || 'dayCamp'; // Default to 'dayCamp' if not provided
+  console.log('Uploading PDF for page:', page, 'URL:', url, 'Original Name:', originalName, 'Section:', section);
 
   try {
     const pdfAsset = await PdfAssets.findOne({ page });
     if (pdfAsset) {
       await PdfAssets.findOneAndUpdate(
         { page },
-        { $push: { pdfs: { url, originalName } } },
+        { $push: { pdfs: { url, originalName, section } } },
         { new: true, runValidators: true }
       );
       console.log('Updated PdfAssets with new PDF:', url);
     } else {
-      await PdfAssets.create({ pdfs: [{ url, originalName }], page });
+      await PdfAssets.create({ pdfs: [{ url, originalName, section }], page });
       console.log('Created new PdfAssets with PDF:', url);
     }
-    res.json({ url });
+    res.json({ url, section }); // Return section with the response
   } catch (err) {
     console.error('Error uploading PDF:', err.message);
     res.status(500).json({ error: 'Failed to upload PDF: ' + err.message });
@@ -284,7 +284,6 @@ router.delete('/pdfs', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'PdfAsset not found' });
     }
 
-    // Delete the physical file from the uploads folder
     const fileName = urlToRemove.split('/').pop();
     const filePath = path.join(__dirname, '../uploads', fileName);
     if (fs.existsSync(filePath)) {
@@ -294,7 +293,6 @@ router.delete('/pdfs', authenticateToken, async (req, res) => {
       console.warn(`File not found in uploads folder: ${filePath}`);
     }
 
-    // Remove the URL from the pdfs array
     if (pdfAsset.pdfs.some(p => p.url === urlToRemove)) {
       await PdfAssets.findOneAndUpdate(
         { page },
@@ -305,7 +303,7 @@ router.delete('/pdfs', authenticateToken, async (req, res) => {
       res.json({ message: 'PDF removed successfully' });
     } else {
       console.log('PDF not found in pdfs array:', urlToRemove);
-      res.json({ message: 'PDF removed successfully' }); // Return success even if not found
+      res.json({ message: 'PDF removed successfully' });
     }
   } catch (err) {
     console.error('Error removing PDF:', err.message);

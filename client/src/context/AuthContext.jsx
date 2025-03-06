@@ -76,18 +76,20 @@ export const fetchWithToken = async (url, options = {}) => {
 
   if (typeof window !== 'undefined') {
     const host = window.location.host;
-    // Check if the current host is a valid production host
-    if (validProductionHosts.includes(host)) {
+    // Use localhost during development, otherwise check valid production hosts
+    if (host === 'localhost' || host === '127.0.0.1' || host.includes('3000')) {
+      baseUrl = 'http://localhost:5000';
+    } else if (validProductionHosts.includes(host)) {
       baseUrl = `${window.location.protocol}//${host}`;
     } else {
-      // Fallback to Heroku URL if the host isn’t recognized
-      baseUrl = 'https://mickelsen-family-farms.herokuapp.com';
-      console.warn('Unrecognized host, falling back to Heroku URL:', host);
+      // Fallback to the environment variable or Heroku URL
+      baseUrl = import.meta.env.VITE_API_URL || 'https://mickelsen-family-farms.herokuapp.com';
+      console.warn('Unrecognized host, falling back to VITE_API_URL:', host);
     }
   } else if (process.env.NODE_ENV === 'production') {
-    baseUrl = 'https://mickelsen-family-farms.herokuapp.com'; // Default production fallback
+    baseUrl = import.meta.env.VITE_API_URL || 'https://mickelsen-family-farms.herokuapp.com';
   } else {
-    baseUrl = 'http://localhost:5000'; // Local development
+    baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   }
 
   const headers = {
