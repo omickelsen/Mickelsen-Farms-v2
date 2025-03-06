@@ -10,12 +10,11 @@ const getFilenameFromUrl = (url) => {
   return parts.slice(1).join('-');
 };
 
-// Map filenames to sections (adjust based on your naming convention)
 const categorizePdf = (pdf) => {
-  const filename = getFilenameFromUrl(pdf.url).toLowerCase(); // Use pdf.url since it's an object
+  const filename = getFilenameFromUrl(pdf).toLowerCase();
   if (filename.includes('riding') || filename.includes('level')) return 'ridingLevels';
   if (filename.includes('registration') || filename.includes('reg')) return 'registration';
-  return 'registration'; // Default to registration if unclear
+  return 'registration'; // Default to registration
 };
 
 function HorseLessons() {
@@ -26,34 +25,25 @@ function HorseLessons() {
   const [error, setError] = useState(null);
   const [deletingImage, setDeletingImage] = useState(null);
 
-  // Define baseUrl at the component level (needed for PDFs, not images)
-  const baseUrl = process.env.NODE_ENV === 'production'
-    ? 'https://mickelsen-family-farms.herokuapp.com'
-    : 'http://localhost:5000';
-
   useEffect(() => {
     const fetchData = async () => {
       try {
         const cacheBuster = new Date().getTime();
-        // Fetch images with baseUrl (but use S3 URLs directly)
         const imageResponse = await fetch(`/api/assets/images?page=horse-lessons&t=${cacheBuster}`);
         if (!imageResponse.ok) {
           throw new Error(`Failed to fetch images: ${imageResponse.status} ${await imageResponse.text()}`);
         }
         const imageData = await imageResponse.json();
-        setImageUrls(imageData.images || []); // Use S3 URLs directly
+        setImageUrls(imageData.images || []);
 
-        // Fetch PDFs with baseUrl
-        const pdfResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=horse-lessons&t=${cacheBuster}`);
+        const pdfResponse = await fetch(`/api/assets/pdfs?page=horse-lessons&t=${cacheBuster}`);
         if (!pdfResponse.ok) {
           throw new Error(`Failed to fetch PDFs: ${pdfResponse.status} ${await pdfResponse.text()}`);
         }
         const pdfData = await pdfResponse.json();
-        
-        // Handle pdfs as an array of objects
         const validPdfs = Array.isArray(pdfData.pdfs) ? pdfData.pdfs.filter(pdf => pdf.url && pdf.url.endsWith('.pdf')) : [];
         const categorizedPdfs = validPdfs.reduce((acc, pdf) => {
-          const category = categorizePdf(pdf);
+          const category = categorizePdf(pdf.url);
           if (category === 'ridingLevels') acc.ridingLevels.push(pdf.url);
           else acc.registration.push(pdf.url);
           return acc;
@@ -91,11 +81,11 @@ function HorseLessons() {
         const errorText = await uploadResponse.text();
         throw new Error(`Image upload failed: ${errorText}`);
       }
-      const updatedResponse = await fetch('/api/assets/images?page=horse-lessons');
+      const updatedResponse = await fetch(`/api/assets/images?page=horse-lessons`);
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         console.log('Updated images after upload:', updatedData);
-        setImageUrls(updatedData.images || []); // Use S3 URLs directly
+        setImageUrls(updatedData.images || []);
         localStorage.setItem('horseLessons_imageUrls', JSON.stringify(updatedData.images));
       }
     } catch (err) {
@@ -117,7 +107,7 @@ function HorseLessons() {
         throw new Error(`Image delete failed: ${errorText}`);
       }
       console.warn(`Image not found on server, proceeding to refresh list: ${urlToRemove}`);
-      const updatedResponse = await fetch('/api/assets/images?page=horse-lessons');
+      const updatedResponse = await fetch(`/api/assets/images?page=horse-lessons`);
       if (!updatedResponse.ok) {
         const errorText = await updatedResponse.text();
         throw new Error(`Failed to fetch updated images after delete: ${errorText}`);
@@ -135,58 +125,63 @@ function HorseLessons() {
     }
   };
 
-  const handlePdfUpload = async (url, section) => {
+  const handlePdfUpload = async (event) => {
     if (!isAdmin) return;
+    const file = event.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('pdf', file);
     try {
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=horse-lessons`);
-      if (!updatedResponse.ok) {
-        const errorText = await updatedResponse.text();
-        throw new Error(`Failed to fetch updated PDFs: ${errorText}`);
+      const uploadResponse = await fetchWithToken('/api/assets/pdfs', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Page': 'horse-lessons', 'Section': categorizePdf(file.name) },
+      });
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`PDF upload failed: ${errorText}`);
       }
-      const updatedData = await updatedResponse.json();
-      console.log('Updated PDFs after upload:', updatedData);
-      const validPdfs = Array.isArray(updatedData.pdfs) ? updatedData.pdfs.filter(pdf => pdf.url && pdf.url.endsWith('.pdf')) : [];
-      const categorizedPdfs = validPdfs.reduce((acc, pdf) => {
-        const category = categorizePdf(pdf);
-        if (category === 'ridingLevels') acc.ridingLevels.push(pdf.url);
-        else acc.registration.push(pdf.url);
-        return acc;
-      }, { ridingLevels: [], registration: [] });
-      setRidingLevelsPdf(categorizedPdfs.ridingLevels);
-      setRegistrationPdf(categorizedPdfs.registration);
-      localStorage.setItem('ridingLevelsPdf', JSON.stringify(categorizedPdfs.ridingLevels));
-      localStorage.setItem('registrationPdf', JSON.stringify(categorizedPdfs.registration));
-      setError(null);
+      const updatedResponse = await fetch(`/api/assets/pdfs?page=horse-lessons`);
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        const validPdfs = Array.isArray(updatedData.pdfs) ? updatedData.pdfs.filter(pdf => pdf.url && pdf.url.endsWith('.pdf')) : [];
+        const categorizedPdfs = validPdfs.reduce((acc, pdf) => {
+          const category = categorizePdf(pdf.url);
+          if (category === 'ridingLevels') acc.ridingLevels.push(pdf.url);
+          else acc.registration.push(pdf.url);
+          return acc;
+        }, { ridingLevels: [], registration: [] });
+        setRidingLevelsPdf(categorizedPdfs.ridingLevels);
+        setRegistrationPdf(categorizedPdfs.registration);
+        localStorage.setItem('ridingLevelsPdf', JSON.stringify(categorizedPdfs.ridingLevels));
+        localStorage.setItem('registrationPdf', JSON.stringify(categorizedPdfs.registration));
+      }
     } catch (err) {
-      console.error('PDF upload fetch error:', err);
+      console.error('PDF upload error:', err);
       setError(err.message);
     }
   };
 
-  const handlePdfRemove = async (urlToRemove, section) => {
+  const handlePdfRemove = async (urlToRemove) => {
     if (!isAdmin) return;
     try {
-      const deleteResponse = await fetchWithToken(`${baseUrl}/api/assets/pdfs`, {
+      const deleteResponse = await fetchWithToken('/api/assets/pdfs', {
         method: 'DELETE',
-        headers: { 'Page': 'horse-lessons', 'Url': urlToRemove },
+        headers: { 'Page': 'horse-lessons', 'Url': urlToRemove }, // Send full S3 URL
       });
-      if (!deleteResponse.ok) {
+      if (!deleteResponse.ok && deleteResponse.status !== 404) {
         const errorText = await deleteResponse.text();
-        console.warn(`DELETE failed for ${urlToRemove} with status ${deleteResponse.status}: ${errorText}`);
-        if (deleteResponse.status !== 404) {
-          throw new Error(`PDF delete failed: ${errorText}`);
-        }
+        throw new Error(`PDF delete failed: ${errorText}`);
       }
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=horse-lessons`);
+      const updatedResponse = await fetch(`/api/assets/pdfs?page=horse-lessons`);
       if (!updatedResponse.ok) {
         const errorText = await updatedResponse.text();
-        throw new Error(`Failed to fetch updated PDFs: ${errorText}`);
+        throw new Error(`Failed to fetch updated PDFs after delete: ${errorText}`);
       }
       const updatedData = await updatedResponse.json();
-      console.log('Updated PDFs after delete:', updatedData);
       const validPdfs = Array.isArray(updatedData.pdfs) ? updatedData.pdfs.filter(pdf => pdf.url && pdf.url.endsWith('.pdf')) : [];
       const categorizedPdfs = validPdfs.reduce((acc, pdf) => {
-        const category = categorizePdf(pdf);
+        const category = categorizePdf(pdf.url);
         if (category === 'ridingLevels') acc.ridingLevels.push(pdf.url);
         else acc.registration.push(pdf.url);
         return acc;
@@ -230,14 +225,14 @@ function HorseLessons() {
                 {ridingLevelsPdf.length > 0 ? (
                   ridingLevelsPdf.map((url, index) => (
                     <div key={index} className="flex items-center">
-                      <PdfDownload url={`${baseUrl}${url}`} label={getFilenameFromUrl(url)} />
-                      {isAdmin && <button onClick={() => handlePdfRemove(url, 'ridingLevels')} className="text-red-500 ml-2">Remove</button>}
+                      <PdfDownload url={url} label={getFilenameFromUrl(url)} /> {/* Use S3 URL directly */}
+                      {isAdmin && <button onClick={() => handlePdfRemove(url)} className="text-red-500 ml-2">Remove</button>}
                     </div>
                   ))
                 ) : (
                   <p>No Riding Levels PDFs available.</p>
                 )}
-                {isAdmin && <PdfUpload onUpload={(url) => handlePdfUpload(url, 'ridingLevels')} page="horse-lessons" />}
+                {isAdmin && <PdfUpload onUpload={handlePdfUpload} page="horse-lessons" />}
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -251,14 +246,14 @@ function HorseLessons() {
                 {registrationPdf.length > 0 ? (
                   registrationPdf.map((url, index) => (
                     <div key={index} className="flex items-center">
-                      <PdfDownload url={`${baseUrl}${url}`} label={getFilenameFromUrl(url)} />
-                      {isAdmin && <button onClick={() => handlePdfRemove(url, 'registration')} className="text-red-500 ml-2">Remove</button>}
+                      <PdfDownload url={url} label={getFilenameFromUrl(url)} /> {/* Use S3 URL directly */}
+                      {isAdmin && <button onClick={() => handlePdfRemove(url)} className="text-red-500 ml-2">Remove</button>}
                     </div>
                   ))
                 ) : (
                   <p>No Registration PDFs available.</p>
                 )}
-                {isAdmin && <PdfUpload onUpload={(url) => handlePdfUpload(url, 'registration')} page="horse-lessons" />}
+                {isAdmin && <PdfUpload onUpload={handlePdfUpload} page="horse-lessons" />}
               </div>
               {isAdmin && (
                 <div className="mt-4">
