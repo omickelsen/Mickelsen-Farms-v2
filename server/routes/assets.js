@@ -115,7 +115,6 @@ router.post('/images', authenticateToken, upload.single('image'), async (req, re
     Key: url.replace('/uploads/', ''), // S3 key (remove /uploads/ prefix)
     Body: req.file.buffer,
     ContentType: req.file.mimetype,
-    ACL: 'public-read', // Make the file publicly accessible
   };
 
   try {
