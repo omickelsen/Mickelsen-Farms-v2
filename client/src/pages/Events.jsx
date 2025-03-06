@@ -28,27 +28,22 @@ function Events() {
   const [error, setError] = useState(null);
   const [deletingImage, setDeletingImage] = useState(null);
 
-  // Define baseUrl at the component level
-  const baseUrl = process.env.NODE_ENV === 'production'
-    ? 'https://mickelsen-family-farms.herokuapp.com'
-    : 'http://localhost:5000';
-
   useEffect(() => {
     const fetchData = async () => {
       try {
         const cacheBuster = new Date().getTime();
-        // Fetch images with baseUrl
-        const imageResponse = await fetch(`${baseUrl}/api/assets/images?page=events&t=${cacheBuster}`);
+        // Fetch images using fetchWithToken
+        const imageResponse = await fetchWithToken(`/api/assets/images?page=events&t=${cacheBuster}`);
         if (!imageResponse.ok) {
           throw new Error(`Failed to fetch images: ${imageResponse.status} ${await imageResponse.text()}`);
         }
         const imageData = await imageResponse.json();
         
-        const fullImageUrls = imageData.images.map(url => `${baseUrl}${url}`);
-        setImageUrls(fullImageUrls);
+        setImageUrls(imageData.images);
+        localStorage.setItem('events_imageUrls', JSON.stringify(imageData.images));
 
-        // Fetch PDFs with baseUrl
-        const pdfResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=events&t=${cacheBuster}`);
+        // Fetch PDFs using fetchWithToken
+        const pdfResponse = await fetchWithToken(`/api/assets/pdfs?page=events&t=${cacheBuster}`);
         if (!pdfResponse.ok) {
           throw new Error(`Failed to fetch PDFs: ${pdfResponse.status} ${await pdfResponse.text()}`);
         }
@@ -90,7 +85,7 @@ function Events() {
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append('image', file));
     try {
-      const uploadResponse = await fetchWithToken(`${baseUrl}/api/assets/images`, {
+      const uploadResponse = await fetchWithToken('/api/assets/images', {
         method: 'POST',
         body: formData,
         headers: { 'Page': 'events' },
@@ -99,12 +94,11 @@ function Events() {
         const errorText = await uploadResponse.text();
         throw new Error(`Image upload failed: ${errorText}`);
       }
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=events`);
+      const updatedResponse = await fetchWithToken('/api/assets/images?page=events');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         console.log('Updated images after upload:', updatedData);
-        const fullImageUrls = updatedData.images.map(url => `${baseUrl}${url}`);
-        setImageUrls(fullImageUrls);
+        setImageUrls(updatedData.images);
         localStorage.setItem('events_imageUrls', JSON.stringify(updatedData.images));
       }
     } catch (err) {
@@ -116,26 +110,24 @@ function Events() {
   const handleImageDelete = async (urlToRemove) => {
     if (!isAdmin) return;
     setDeletingImage(urlToRemove);
-    const relativeUrl = urlToRemove.startsWith(baseUrl) ? urlToRemove.replace(baseUrl, '') : urlToRemove;
     try {
-      const deleteResponse = await fetchWithToken(`${baseUrl}/api/assets/images`, {
+      const deleteResponse = await fetchWithToken('/api/assets/images', {
         method: 'DELETE',
-        headers: { 'Page': 'events', 'Url': relativeUrl },
+        headers: { 'Page': 'events', 'Url': urlToRemove },
       });
       if (!deleteResponse.ok && deleteResponse.status !== 404) {
         const errorText = await deleteResponse.text();
         throw new Error(`Image delete failed: ${errorText}`);
       }
-      console.warn(`Image not found on server, proceeding to refresh list: ${relativeUrl}`);
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=events`);
+      console.warn(`Image not found on server, proceeding to refresh list: ${urlToRemove}`);
+      const updatedResponse = await fetchWithToken('/api/assets/images?page=events');
       if (!updatedResponse.ok) {
         const errorText = await updatedResponse.text();
         throw new Error(`Failed to fetch updated images after delete: ${errorText}`);
       }
       const updatedData = await updatedResponse.json();
       console.log('Updated images after delete:', updatedData);
-      const fullImageUrls = updatedData.images.map(url => `${baseUrl}${url}`);
-      setImageUrls(fullImageUrls);
+      setImageUrls(updatedData.images);
       localStorage.setItem('events_imageUrls', JSON.stringify(updatedData.images));
       setError(null);
     } catch (err) {
@@ -149,7 +141,7 @@ function Events() {
   const handlePdfUpload = async (url, section) => {
     if (!isAdmin) return;
     try {
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=events`);
+      const updatedResponse = await fetchWithToken('/api/assets/pdfs?page=events');
       if (!updatedResponse.ok) {
         const errorText = await updatedResponse.text();
         throw new Error(`Failed to fetch updated PDFs: ${errorText}`);
@@ -180,7 +172,7 @@ function Events() {
   const handlePdfRemove = async (urlToRemove, section) => {
     if (!isAdmin) return;
     try {
-      const deleteResponse = await fetchWithToken(`${baseUrl}/api/assets/pdfs`, {
+      const deleteResponse = await fetchWithToken('/api/assets/pdfs', {
         method: 'DELETE',
         headers: { 'Page': 'events', 'Url': urlToRemove },
       });
@@ -191,7 +183,7 @@ function Events() {
           throw new Error(`PDF delete failed: ${errorText}`);
         }
       }
-      const updatedResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=events`);
+      const updatedResponse = await fetchWithToken('/api/assets/pdfs?page=events');
       if (!updatedResponse.ok) {
         const errorText = await updatedResponse.text();
         throw new Error(`Failed to fetch updated PDFs: ${errorText}`);
@@ -242,7 +234,7 @@ function Events() {
                 {dayCampPdf.length > 0 ? (
                   dayCampPdf.map((url, index) => (
                     <div key={index} className="flex items-center">
-                      <PdfDownload url={`${baseUrl}${url}`} label={getFilenameFromUrl(url)} />
+                      <PdfDownload url={url} label={getFilenameFromUrl(url)} />
                       {isAdmin && <button onClick={() => handlePdfRemove(url, 'dayCamp')} className="text-red-500 ml-2">Remove</button>}
                     </div>
                   ))
@@ -259,7 +251,7 @@ function Events() {
                 {partyPdf.length > 0 ? (
                   partyPdf.map((url, index) => (
                     <div key={index} className="flex items-center">
-                      <PdfDownload url={`${baseUrl}${url}`} label={getFilenameFromUrl(url)} />
+                      <PdfDownload url={url} label={getFilenameFromUrl(url)} />
                       {isAdmin && <button onClick={() => handlePdfRemove(url, 'party')} className="text-red-500 ml-2">Remove</button>}
                     </div>
                   ))
@@ -316,7 +308,7 @@ function Events() {
                 {waiverPdf.length > 0 ? (
                   waiverPdf.map((url, index) => (
                     <div key={index} className="flex items-center">
-                      <PdfDownload url={`${baseUrl}${url}`} label={getFilenameFromUrl(url)} />
+                      <PdfDownload url={url} label={getFilenameFromUrl(url)} />
                       {isAdmin && <button onClick={() => handlePdfRemove(url, 'waiver')} className="text-red-500 ml-2">Remove</button>}
                     </div>
                   ))
