@@ -11,7 +11,7 @@ const HeroSection = () => {
 
   // Define baseUrl at the component level
   const baseUrl = process.env.NODE_ENV === 'production'
-    ? ['https://mickelsen-family-farms.herokuapp.com', 'https://mickelsenfamilyfarms.com', 'https://www.mickelsenfamilyfarms.com']
+    ? 'https://mickelsen-family-farms.herokuapp.com'
     : 'http://localhost:5000';
 
   useEffect(() => {
