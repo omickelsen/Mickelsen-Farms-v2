@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Home from './pages/Home';
@@ -15,39 +15,10 @@ import AdminTrailRides from './pages/AdminTrailRides';
 import AdminEvents from './pages/AdminEvents';
 
 function App() {
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      if (window.google) {
-        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-        if (!clientId) {
-          console.error('VITE_GOOGLE_CLIENT_ID is not set in .env file');
-          return;
-        }
-        // Initialization handled in Header.jsx, so no renderButton here
-      }
-    };
-    script.onerror = () => console.error('Failed to load Google Sign-In SDK');
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  const handleCredentialResponse = (response) => {
-    localStorage.setItem('googleIdToken', response.credential);
-    window.location.href = '/';
-  };
-
   return (
     <AuthProvider>
       <Router>
         <div>
-          <Header />
           <main>
             <Routes>
               <Route path="/" element={<Home />} />
@@ -96,7 +67,8 @@ function App() {
                   </RequireAdmin>
                 }
               />
-              <Route path="*" element={<Navigate to="/" />} />
+              <Route path="/auth/success" element={<AuthSuccess />} /> {/* Exact match */}
+              <Route path="*" element={<Home />} /> {/* Fallback to Home */}
             </Routes>
           </main>
         </div>
@@ -108,15 +80,33 @@ function App() {
 function RequireAdmin({ children }) {
   const { token, isAdmin, loading, error } = useAuth();
 
-  useEffect(() => {
-  }, [token, isAdmin, loading, error]);
-
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error}</p>;
   if (!token || !isAdmin) {
     return <Navigate to="/" replace />;
   }
   return children;
+}
+
+// Component to handle the redirect success
+function AuthSuccess() {
+  const { token, setToken } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const tokenFromUrl = urlParams.get('token');
+    
+    if (tokenFromUrl && tokenFromUrl !== token) {
+      localStorage.setItem('jwtToken', tokenFromUrl); // Store the JWT
+      setToken(tokenFromUrl); // Update context state
+      
+    }
+    navigate('/', { replace: true }); // Redirect to home after setting token
+  }, [token, setToken, location, navigate]);
+
+  return <p>Authenticating... Please wait.</p>;
 }
 
 export default App;

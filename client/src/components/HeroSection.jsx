@@ -2,42 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
 
 const HeroSection = () => {
-  const { token, isAdmin } = useAuth();
+  const { isAdmin, token } = useAuth();
   const [backgroundImage, setBackgroundImage] = useState('/path-to-farm-image.jpg');
-  const [isUploading, setIsUploading] = useState(false);
-  const [images, setImages] = useState([]); // Store all images for delete option
-  const [error, setError] = useState(null); // State for error messages
-  const [success, setSuccess] = useState(null); // State for success messages
+  const [images, setImages] = useState([]);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [deletingImage, setDeletingImage] = useState(null);
+
+  // Define baseUrl at the component level
+  const baseUrl = process.env.NODE_ENV === 'production'
+    ? 'https://mickelsen-family-farms.herokuapp.com'
+    : 'http://localhost:5000';
 
   useEffect(() => {
     const fetchHeroBackground = async () => {
       try {
-        const response = await fetch('/api/images?page=default'); // Relative path for proxy
-        if (response.ok) {
-          const data = await response.json();
-          if (process.env.NODE_ENV === 'development') {
-            
-          }
-          setImages(data.images || []);
-          setBackgroundImage(data.images[0] || '/path-to-farm-image.jpg');
-        } else {
-          if (process.env.NODE_ENV === 'development') {
-            console.error('Fetch failed with status:', response.status);
-          }
-          setError('Failed to fetch hero background.');
+        const cacheBuster = new Date().getTime();
+        const response = await fetch(`${baseUrl}/api/assets/images?page=default&t=${cacheBuster}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch hero background: ${response.status} ${await response.text()}`);
         }
+        const data = await response.json();
+        const fullImageUrls = Array.isArray(data.images) ? data.images.map(url => `${baseUrl}${url}`) : [];
+        setImages(fullImageUrls);
+        setBackgroundImage(fullImageUrls[0] || '/path-to-farm-image.jpg');
+        setError(null);
       } catch (err) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error fetching hero background:', err);
-        }
+        console.error('Error fetching hero background:', err);
         setError('Error fetching hero background.');
+        setImages([]);
       }
     };
+
     fetchHeroBackground();
-  }, []);
+  }, [baseUrl, isAdmin, token]);
 
   const handleImageUpload = async (event) => {
-    if (!isAdmin || !token) {
+    if (!isAdmin) {
       setError('Only admins can change the background image.');
       return;
     }
@@ -45,13 +46,12 @@ const HeroSection = () => {
     const file = event.target.files[0];
     if (!file) return;
 
-    setIsUploading(true);
     const formData = new FormData();
     formData.append('image', file);
 
     try {
       const uploadResponse = await fetchWithToken(
-        '/api/images', // Relative path for proxy
+        `${baseUrl}/api/assets/images`,
         {
           method: 'POST',
           body: formData,
@@ -63,73 +63,66 @@ const HeroSection = () => {
         const errorText = await uploadResponse.text();
         throw new Error(`Failed to upload image: ${errorText}`);
       }
-      const uploadData = await uploadResponse.json();
-      if (process.env.NODE_ENV === 'development') {
-        
-      }
 
-      // Re-fetch the updated background image
-      const updatedResponse = await fetch('/api/images?page=default');
+      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=default`);
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        if (process.env.NODE_ENV === 'development') {
-          
-        }
-        setImages(updatedData.images || []);
-        setBackgroundImage(updatedData.images[0] || uploadData.url || '/path-to-farm-image.jpg');
+        
+        const fullImageUrls = Array.isArray(updatedData.images) ? updatedData.images.map(url => `${baseUrl}${url}`) : [];
+        setImages(fullImageUrls);
+        setBackgroundImage(fullImageUrls[0] || '/path-to-farm-image.jpg');
         setSuccess('Background image updated successfully!');
       } else {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Update fetch failed with status:', updatedResponse.status);
-        }
-        setError('Failed to update background image.');
+        throw new Error('Failed to update background image.');
       }
     } catch (err) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error updating hero background:', err);
-      }
+      console.error('Error updating hero background:', err);
       setError(`Failed to update background image: ${err.message}`);
-    } finally {
-      setIsUploading(false);
     }
   };
 
   const handleImageDelete = async (urlToRemove) => {
-    if (!isAdmin || !token) {
+    if (!isAdmin) {
       setError('Only admins can delete images.');
       return;
     }
 
+    setDeletingImage(urlToRemove);
+    const relativeUrl = urlToRemove.startsWith(baseUrl) ? urlToRemove.replace(baseUrl, '') : urlToRemove;
+
     try {
       const deleteResponse = await fetchWithToken(
-        '/api/images', // Relative path for proxy
+        `${baseUrl}/api/assets/images`,
         {
           method: 'DELETE',
-          headers: { 'Page': 'default', 'Url': urlToRemove },
+          headers: { 'Page': 'default', 'Url': relativeUrl },
         }
       );
 
-      if (!deleteResponse.ok) {
+      if (!deleteResponse.ok && deleteResponse.status !== 404) {
         const errorText = await deleteResponse.text();
         throw new Error(`Failed to delete image: ${errorText}`);
       }
 
-      // Re-fetch after deletion
-      const updatedResponse = await fetch('/api/images?page=default');
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        if (process.env.NODE_ENV === 'development') {
-          
-        }
-        setImages(updatedData.images || []);
-        setBackgroundImage(updatedData.images[0] || '/path-to-farm-image.jpg');
-        setSuccess('Image deleted successfully!');
+      console.warn(`Image not found on server, proceeding to refresh list: ${relativeUrl}`);
+      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=default`);
+      if (!updatedResponse.ok) {
+        const errorText = await updatedResponse.text();
+        throw new Error(`Failed to fetch updated images after delete: ${errorText}`);
       }
+
+      const updatedData = await updatedResponse.json();
+      console.log('Updated images after delete:', updatedData);
+      const fullImageUrls = Array.isArray(updatedData.images) ? updatedData.images.map(url => `${baseUrl}${url}`) : [];
+      setImages(fullImageUrls);
+      setBackgroundImage(fullImageUrls[0] || '/path-to-farm-image.jpg');
+      setSuccess('Image deleted successfully!');
+      setError(null);
     } catch (err) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error deleting image:', err);
-      }
+      console.error('Error deleting image:', err);
       setError(`Failed to delete image: ${err.message}`);
+    } finally {
+      setDeletingImage(null);
     }
   };
 
@@ -151,10 +144,8 @@ const HeroSection = () => {
             type="file"
             accept="image/*"
             onChange={handleImageUpload}
-            disabled={isUploading}
             className="btn-primary p-2 rounded"
           />
-          {isUploading && <span className="ml-2 text-white">Uploading...</span>}
           {error && <div className="text-red-500 mt-2">{error}</div>}
           {success && <div className="text-green-500 mt-2">{success}</div>}
           {images.length > 0 && (
@@ -164,8 +155,9 @@ const HeroSection = () => {
                   key={index}
                   onClick={() => handleImageDelete(url)}
                   className="ml-2 bg-red-600 text-white p-1 rounded"
+                  disabled={deletingImage === url}
                 >
-                  Delete {index + 1}
+                  {deletingImage === url ? 'Deleting...' : `Delete ${index + 1}`}
                 </button>
               ))}
             </div>

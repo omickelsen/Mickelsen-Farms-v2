@@ -14,7 +14,7 @@ const ImageUpload = ({ onUpload, page }) => {
       acceptedFiles.forEach((file) => formData.append('image', file));
 
       try {
-        const response = await fetchWithToken('/api/images', {
+        const response = await fetchWithToken('/api/assets/images', {
           method: 'POST',
           body: formData,
           headers: { 'Page': page || 'default' },

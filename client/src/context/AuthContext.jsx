@@ -3,27 +3,35 @@ import { createContext, useState, useEffect, useContext } from 'react';
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('googleIdToken') || null);
+  const [token, setToken] = useState(localStorage.getItem('jwtToken') || null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const verifyToken = async () => {
-      const idToken = localStorage.getItem('googleIdToken');
-      if (idToken) {
+    const initializeAuth = async () => {
+      const jwtToken = localStorage.getItem('jwtToken');
+      if (jwtToken) {
         try {
-          const response = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
-          if (!response.ok) throw new Error(`Token verification failed with status ${response.status}`);
-          const data = await response.json();
-          const ADMIN_EMAILS = ['omickelsen@gmail.com', 'mickelsenfamilyfarms@gmail.com']; // Consistent with backend
-          setIsAdmin(ADMIN_EMAILS.includes(data.email));
-          setUser({ email: data.email });
-          setToken(idToken);
+          // Verify token with backend
+          const response = await fetch('http://localhost:5000/api/verify-token', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${jwtToken}`,
+            },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setIsAdmin(data.isAdmin);
+            setUser({ email: data.email });
+            setToken(jwtToken); // Ensure token is set
+          } else {
+            throw new Error('Token verification failed');
+          }
         } catch (err) {
           setError(err.message);
-          localStorage.removeItem('googleIdToken');
+          localStorage.removeItem('jwtToken');
           setToken(null);
           setUser(null);
           setIsAdmin(false);
@@ -32,11 +40,20 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     };
 
-    verifyToken();
-  }, []); // Run once on mount
+    initializeAuth();
+  }, []); // Run only on mount
+
+  // Update token in localStorage and state when setToken is called
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem('jwtToken', token);
+    } else {
+      localStorage.removeItem('jwtToken');
+    }
+  }, [token]);
 
   const logout = () => {
-    localStorage.removeItem('googleIdToken');
+    localStorage.removeItem('jwtToken');
     setToken(null);
     setUser(null);
     setIsAdmin(false);
@@ -50,12 +67,30 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const fetchWithToken = async (url, options = {}) => {
-  const idToken = localStorage.getItem('googleIdToken');
+  const jwtToken = localStorage.getItem('jwtToken');
+  const baseUrl = process.env.NODE_ENV === 'production'
+    ? 'https://mickelsen-family-farms.herokuapp.com'
+    : 'http://localhost:5000';
+
+  // Only add Authorization header if jwtToken exists
   const headers = {
     ...options.headers,
-    'Authorization': `Bearer ${idToken || ''}`,
   };
-  return fetch(url.startsWith('http') ? url : `/${url.replace(/^\//, '')}`, { // Ensure relative paths
+  if (jwtToken) {
+    headers['Authorization'] = `Bearer ${jwtToken}`;
+  }
+
+ 
+
+  // Ensure the URL is a string
+  if (typeof url !== 'string') {
+    throw new Error(`Invalid URL: ${url}`);
+  }
+
+  // If the URL doesn't start with http, prepend baseUrl
+  const finalUrl = url.startsWith('http') ? url : `${baseUrl}${url.replace(/^\//, '')}`;
+
+  return fetch(finalUrl, {
     ...options,
     headers,
   });

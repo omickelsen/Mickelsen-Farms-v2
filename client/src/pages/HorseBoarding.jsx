@@ -3,110 +3,193 @@ import EditableSection from '../components/EditableSection';
 import PdfUpload from '../components/PdfUpload';
 import PdfDownload from '../components/PdfDownload';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
+import Header from '../components/Header';
 
 const getFilenameFromUrl = (url) => {
   const parts = url.substring(url.lastIndexOf('/') + 1).split('-');
   return parts.slice(1).join('-');
 };
 
+// Map filenames to sections (adjust based on your naming convention)
+const categorizePdf = (pdf) => {
+  const filename = getFilenameFromUrl(pdf.url).toLowerCase();
+  if (filename.includes('document') || filename.includes('doc')) return 'documents';
+  return 'documents'; // Default to documents
+};
+
 function HorseBoarding() {
   const { isAdmin, token } = useAuth() || {};
   const [imageUrls, setImageUrls] = useState([]);
   const [documentsPdf, setDocumentsPdf] = useState([]);
+  const [error, setError] = useState(null);
+  const [deletingImage, setDeletingImage] = useState(null);
+
+  // Define baseUrl at the component level
+  const baseUrl = process.env.NODE_ENV === 'production'
+    ? 'https://mickelsen-family-farms.herokuapp.com'
+    : 'http://localhost:5000';
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const imageResponse = await fetch('/api/images?page=horse-boarding');
+        const cacheBuster = new Date().getTime();
+        // Fetch images with baseUrl
+        const imageResponse = await fetch(`${baseUrl}/api/assets/images?page=horse-boarding&t=${cacheBuster}`);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch images: ${imageResponse.status} ${await imageResponse.text()}`);
+        }
         const imageData = await imageResponse.json();
-        setImageUrls(imageData.images || []);
+        
+        const fullImageUrls = imageData.images.map(url => `${baseUrl}${url}`);
+        setImageUrls(fullImageUrls);
 
-        const pdfResponse = await fetch('/api/pdfs?page=horse-boarding');
-        if (!pdfResponse.ok) throw new Error('Failed to fetch PDFs');
+        // Fetch PDFs with baseUrl
+        const pdfResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=horse-boarding&t=${cacheBuster}`);
+        if (!pdfResponse.ok) {
+          throw new Error(`Failed to fetch PDFs: ${pdfResponse.status} ${await pdfResponse.text()}`);
+        }
         const pdfData = await pdfResponse.json();
-        setDocumentsPdf(pdfData.pdfs || []);
-        localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(pdfData.pdfs || []));
+        
+        const validPdfs = Array.isArray(pdfData.pdfs) ? pdfData.pdfs.filter(pdf => pdf.url && pdf.url.endsWith('.pdf')) : [];
+        const categorizedPdfs = validPdfs.reduce((acc, pdf) => {
+          const category = categorizePdf(pdf);
+          if (category === 'documents') acc.documents.push(pdf.url);
+          return acc;
+        }, { documents: [] });
+        setDocumentsPdf(categorizedPdfs.documents);
+        localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(categorizedPdfs.documents));
+        setError(null);
       } catch (err) {
         console.error('Fetch error:', err);
+        setError(err.message);
         const savedPdfs = localStorage.getItem('horseBoarding_documentsPdf');
-        if (savedPdfs) setDocumentsPdf(JSON.parse(savedPdfs));
+        if (savedPdfs) setDocumentsPdf(JSON.parse(savedPdfs) || []);
       }
     };
     fetchData();
   }, []);
 
   const handleImageUpload = async (event) => {
-    if (!isAdmin || !token) return;
+    if (!isAdmin) return;
     const files = event.target.files;
     if (!files.length) return;
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append('image', file));
     try {
-      const uploadResponse = await fetchWithToken('/api/images', {
+      const uploadResponse = await fetchWithToken(`${baseUrl}/api/assets/images`, {
         method: 'POST',
         body: formData,
         headers: { 'Page': 'horse-boarding' },
       });
-      if (!uploadResponse.ok) throw new Error('Image upload failed');
-      const updatedResponse = await fetch('/api/images?page=horse-boarding');
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`Image upload failed: ${errorText}`);
+      }
+      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=horse-boarding`);
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
-        setImageUrls(updatedData.images || []);
+        console.log('Updated images after upload:', updatedData);
+        const fullImageUrls = updatedData.images.map(url => `${baseUrl}${url}`);
+        setImageUrls(fullImageUrls);
+        localStorage.setItem('horseBoarding_imageUrls', JSON.stringify(updatedData.images));
       }
     } catch (err) {
-      console.error(err);
+      console.error('Image upload error:', err);
+      setError(err.message);
     }
   };
 
   const handleImageDelete = async (urlToRemove) => {
-    if (!isAdmin || !token) return;
+    if (!isAdmin) return;
+    setDeletingImage(urlToRemove);
+    const relativeUrl = urlToRemove.startsWith(baseUrl) ? urlToRemove.replace(baseUrl, '') : urlToRemove;
     try {
-      const deleteResponse = await fetchWithToken('/api/images', {
+      const deleteResponse = await fetchWithToken(`${baseUrl}/api/assets/images`, {
         method: 'DELETE',
-        headers: { 'Page': 'horse-boarding', 'Url': urlToRemove },
+        headers: { 'Page': 'horse-boarding', 'Url': relativeUrl },
       });
-      if (!deleteResponse.ok) throw new Error('Image delete failed');
-      const updatedResponse = await fetch('/api/images?page=horse-boarding');
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        setImageUrls(updatedData.images || []);
+      if (!deleteResponse.ok && deleteResponse.status !== 404) {
+        const errorText = await deleteResponse.text();
+        throw new Error(`Image delete failed: ${errorText}`);
       }
+      console.warn(`Image not found on server, proceeding to refresh list: ${relativeUrl}`);
+      const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=horse-boarding`);
+      if (!updatedResponse.ok) {
+        const errorText = await updatedResponse.text();
+        throw new Error(`Failed to fetch updated images after delete: ${errorText}`);
+      }
+      const updatedData = await updatedResponse.json();
+      console.log('Updated images after delete:', updatedData);
+      const fullImageUrls = updatedData.images.map(url => `${baseUrl}${url}`);
+      setImageUrls(fullImageUrls);
+      localStorage.setItem('horseBoarding_imageUrls', JSON.stringify(updatedData.images));
+      setError(null);
     } catch (err) {
-      console.error(err);
+      console.error('Image delete error:', err);
+      setError(`Image delete failed: ${err.message}`);
+    } finally {
+      setDeletingImage(null);
     }
   };
 
   const handlePdfUpload = async (url) => {
     if (!isAdmin) return;
-    setDocumentsPdf((prev) => {
-      const updated = [...prev, url];
-      localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updated));
-      return updated;
-    });
-    const updatedResponse = await fetch('/api/pdfs?page=horse-boarding');
-    if (updatedResponse.ok) {
+    try {
+      const updatedResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=horse-boarding`);
+      if (!updatedResponse.ok) {
+        const errorText = await updatedResponse.text();
+        throw new Error(`Failed to fetch updated PDFs: ${errorText}`);
+      }
       const updatedData = await updatedResponse.json();
-      setDocumentsPdf(updatedData.pdfs || []);
-      localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updatedData.pdfs || []));
+      console.log('Updated PDFs after upload:', updatedData);
+      const validPdfs = Array.isArray(updatedData.pdfs) ? updatedData.pdfs.filter(pdf => pdf.url && pdf.url.endsWith('.pdf')) : [];
+      const categorizedPdfs = validPdfs.reduce((acc, pdf) => {
+        const category = categorizePdf(pdf);
+        if (category === 'documents') acc.documents.push(pdf.url);
+        return acc;
+      }, { documents: [] });
+      setDocumentsPdf(categorizedPdfs.documents);
+      localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(categorizedPdfs.documents));
+      setError(null);
+    } catch (err) {
+      console.error('PDF upload fetch error:', err);
+      setError(err.message);
     }
   };
 
   const handlePdfRemove = async (urlToRemove) => {
     if (!isAdmin) return;
     try {
-      const response = await fetchWithToken('/api/pdfs', {
+      const deleteResponse = await fetchWithToken(`${baseUrl}/api/assets/pdfs`, {
         method: 'DELETE',
         headers: { 'Page': 'horse-boarding', 'Url': urlToRemove },
       });
-      if (!response.ok) throw new Error('PDF delete failed');
-      const updatedResponse = await fetch('/api/pdfs?page=horse-boarding');
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        setDocumentsPdf(updatedData.pdfs || []);
-        localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(updatedData.pdfs || []));
+      if (!deleteResponse.ok) {
+        const errorText = await deleteResponse.text();
+        console.warn(`DELETE failed for ${urlToRemove} with status ${deleteResponse.status}: ${errorText}`);
+        if (deleteResponse.status !== 404) {
+          throw new Error(`PDF delete failed: ${errorText}`);
+        }
       }
+      const updatedResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=horse-boarding`);
+      if (!updatedResponse.ok) {
+        const errorText = await updatedResponse.text();
+        throw new Error(`Failed to fetch updated PDFs: ${errorText}`);
+      }
+      const updatedData = await updatedResponse.json();
+      console.log('Updated PDFs after delete:', updatedData);
+      const validPdfs = Array.isArray(updatedData.pdfs) ? updatedData.pdfs.filter(pdf => pdf.url && pdf.url.endsWith('.pdf')) : [];
+      const categorizedPdfs = validPdfs.reduce((acc, pdf) => {
+        const category = categorizePdf(pdf);
+        if (category === 'documents') acc.documents.push(pdf.url);
+        return acc;
+      }, { documents: [] });
+      setDocumentsPdf(categorizedPdfs.documents);
+      localStorage.setItem('horseBoarding_documentsPdf', JSON.stringify(categorizedPdfs.documents));
+      setError(null);
     } catch (err) {
-      console.error(err);
+      console.error('PDF remove error:', err);
+      setError(err.message);
     }
   };
 
@@ -115,67 +198,77 @@ function HorseBoarding() {
   const closeModal = () => setSelectedImage(null);
 
   return (
-    <div className="py-16 bg-gray-50 min-h-screen">
-      <h2 className="text-4xl font-bold text-center text-teal-700 mb-12">Horse Boarding</h2>
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h3 className="text-2xl font-semibold text-teal-600 mb-4">Overview</h3>
-            <EditableSection page="horse-boarding" initialContent="Top-notch horse boarding with spacious stalls, daily care, and training facilities." field="overview" />
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h3 className="text-2xl font-semibold text-teal-600 mb-4">Pricing</h3>
-            <EditableSection page="horse-boarding" initialContent="Currently: $400 per month. $50 initial deposit. Extra Fees for special requests (SawDust). Boarding fees are subject to change based off of feed cost." field="pricing" />
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h3 className="text-2xl font-semibold text-teal-600 mb-4">Extras</h3>
-            <EditableSection page="horse-boarding" initialContent="Extras include grooming ($50/week), training sessions ($75/hour), and custom feed plans." field="extras" />
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h3 className="text-2xl font-semibold text-teal-600 mb-4">Gallery & Documents</h3>
-            {isAdmin && (
-              <div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="border p-2 rounded mb-4"
-                />
-              </div>
-            )}
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-              {imageUrls.map((url, index) => (
-                <div key={index} className="relative">
-                  <img
-                    src={url}
-                    alt={`Horse Boarding ${index + 1}`}
-                    className="w-full h-48 object-cover rounded-lg cursor-pointer"
-                    onClick={() => openModal(url)}
-                  />
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleImageDelete(url)}
-                      className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded"
-                    >
-                      X
-                    </button>
-                  )}
-                </div>
-              ))}
+    <div className="bg-gray-50 min-h-screen">
+      <Header />
+      <div className="py-8">
+        <h2 className="text-4xl font-bold text-center text-teal-700 mb-12">Horse Boarding</h2>
+        {error && <div className="text-red-500 text-center mb-4">{error}</div>}
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <h3 className="text-2xl font-semibold text-teal-600 mb-4">Overview</h3>
+              <EditableSection page="horse-boarding" initialContent="Top-notch horse boarding with spacious stalls, daily care, and training facilities." field="overview" />
             </div>
-            {isAdmin && <PdfUpload onUpload={handlePdfUpload} page="horse-boarding" />}
-            {documentsPdf.length > 0 && (
-              <div className="mt-4">
-                <EditableSection page="horse-boarding" initialContent="Download our boarding documents:" field="pdf" />
-                {documentsPdf.map((url, index) => (
-                  <div key={index} className="flex items-center justify-between mt-2">
-                    <PdfDownload url={url} label={getFilenameFromUrl(url)} />
-                    {isAdmin && <button onClick={() => handlePdfRemove(url)} className="text-red-500 ml-2">Remove</button>}
-                  </div>
-                ))}
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <h3 className="text-2xl font-semibold text-teal-600 mb-4">Pricing</h3>
+              <EditableSection page="horse-boarding" initialContent="Currently: $400 per month. $50 initial deposit. Extra Fees for special requests (SawDust). Boarding fees are subject to change based off of feed cost." field="pricing" />
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <h3 className="text-2xl font-semibold text-teal-600 mb-4">Extras</h3>
+              <EditableSection page="horse-boarding" initialContent="Extras include grooming ($50/week), training sessions ($75/hour), and custom feed plans." field="extras" />
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <h3 className="text-2xl font-semibold text-teal-600 mb-4">Gallery & Documents</h3>
+              {isAdmin && (
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="border p-2 rounded mb-4"
+                  />
+                </div>
+              )}
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                {imageUrls.length > 0 ? (
+                  imageUrls.map((url, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={url}
+                        alt={`Horse Boarding ${index + 1}`}
+                        className="w-full h-48 object-cover rounded-lg cursor-pointer"
+                        onClick={() => openModal(url)}
+                        onError={() => console.error(`Failed to load image: ${url}`)}
+                      />
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleImageDelete(url)}
+                          className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded"
+                          disabled={deletingImage === url}
+                        >
+                          {deletingImage === url ? 'Deleting...' : 'X'}
+                        </button>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p>No images available.</p>
+                )}
               </div>
-            )}
+              {isAdmin && <PdfUpload onUpload={(url) => handlePdfUpload(url)} page="horse-boarding" />}
+              {documentsPdf.length > 0 && (
+                <div className="mt-4">
+                  <EditableSection page="horse-boarding" initialContent="Download our boarding documents:" field="pdf" />
+                  {documentsPdf.map((url, index) => (
+                    <div key={index} className="flex items-center">
+                      <PdfDownload url={`${baseUrl}${url}`} label={getFilenameFromUrl(url)} />
+                      {isAdmin && <button onClick={() => handlePdfRemove(url)} className="text-red-500 ml-2">Remove</button>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -8,9 +8,11 @@ const PdfUpload = ({ onUpload, page }) => {
     async (event) => {
       const file = event.target.files[0];
       if (!isAdmin || !token) {
+        console.log('Upload prevented: Not an admin or no token');
         return;
       }
       if (!file || !file.type.startsWith('application/pdf')) {
+        console.log('Invalid file uploaded:', file ? file.type : 'No file');
         return;
       }
 
@@ -18,16 +20,25 @@ const PdfUpload = ({ onUpload, page }) => {
       formData.append('pdf', file);
 
       try {
-        const response = await fetchWithToken('/api/pdfs', {
+        const baseUrl = process.env.NODE_ENV === 'production'
+          ? 'https://mickelsen-family-farms.herokuapp.com'
+          : 'http://localhost:5000';
+        const response = await fetchWithToken(`${baseUrl}/api/assets/pdfs`, {
           method: 'POST',
           body: formData,
           headers: { 'Page': page },
         });
-        if (!response.ok) throw new Error('Failed to upload PDF');
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to upload PDF: ${errorText} (Status: ${response.status})`);
+        }
         const data = await response.json();
+        console.log('PDF upload successful, response:', data);
         if (onUpload) onUpload(data.url);
       } catch (err) {
-        // Error handled silently in production
+        console.error('PDF upload error:', err.message);
+        // Optionally notify the user in the UI
+        alert(`PDF upload failed: ${err.message}`);
       }
     },
     [token, isAdmin, onUpload, page]
