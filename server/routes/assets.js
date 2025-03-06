@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
+const AWS = require('aws-sdk');
 
 const authenticateToken = async (req, res, next) => {
   console.log('Authenticating token for:', req.url, req.method);
@@ -27,20 +28,17 @@ const authenticateToken = async (req, res, next) => {
   next();
 };
 
-// Multer configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir);
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
+// Configure AWS S3
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION,
 });
+const s3 = new AWS.S3();
+const bucketName = process.env.AWS_BUCKET_NAME;
 
+// Multer configuration (use memory storage for S3 upload)
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 // Helper function to extract filename
@@ -50,7 +48,7 @@ const getCleanFilename = (url) => {
   return filenameParts.join('-');
 };
 
-// Initial data setup
+// Initial data setup (unchanged)
 const initializeAssets = async () => {
   const pages = ['horse-boarding', 'horse-lessons', 'trail-rides', 'events', 'default', 'carousel'];
   for (const page of pages) {
@@ -80,10 +78,9 @@ const initializeAssets = async () => {
   console.log('Initial assets data setup completed');
 };
 
-// Run initial setup once on module load
 initializeAssets().catch(err => console.error('Initial setup error:', err));
 
-// Image-related routes (unchanged)
+// Image-related routes
 router.get('/images', async (req, res) => {
   console.log('Fetching images for page:', req.query.page);
   const page = req.query.page || 'default';
@@ -105,30 +102,40 @@ router.post('/images', authenticateToken, upload.single('image'), async (req, re
     console.log('Unauthorized image upload attempt by:', req.user?.email);
     return res.status(403).json({ error: 'Admin access required' });
   }
-  if (!req.file || !req.file.filename) {
+  if (!req.file || !req.file.buffer) {
     console.log('Invalid image upload attempt:', req.file);
     return res.status(400).json({ error: 'No valid image provided' });
   }
-  const url = `/uploads/${req.file.filename}`;
+  const url = `/uploads/${req.file.originalname}-${Date.now()}`; // Unique filename
   const page = req.headers.page || 'default';
   console.log('Uploading image for page:', page, 'URL:', url);
 
+  const params = {
+    Bucket: bucketName,
+    Key: url.replace('/uploads/', ''), // S3 key (remove /uploads/ prefix)
+    Body: req.file.buffer,
+    ContentType: req.file.mimetype,
+    ACL: 'public-read', // Make the file publicly accessible
+  };
+
   try {
+    const s3Response = await s3.upload(params).promise();
+    console.log('Image uploaded to S3:', s3Response.Location);
     const imageAsset = await ImageAssets.findOne({ page });
     if (imageAsset) {
       await ImageAssets.findOneAndUpdate(
         { page },
-        { $push: { urls: url }, $set: { url: url } },
+        { $push: { urls: s3Response.Location }, $set: { url: s3Response.Location } },
         { new: true, runValidators: true }
       );
-      console.log('Updated ImageAssets with new image:', url);
+      console.log('Updated ImageAssets with new image:', s3Response.Location);
     } else {
-      await ImageAssets.create({ url: url, urls: [url], page });
-      console.log('Created new ImageAssets with image:', url);
+      await ImageAssets.create({ url: s3Response.Location, urls: [s3Response.Location], page });
+      console.log('Created new ImageAssets with image:', s3Response.Location);
     }
-    res.json({ url });
+    res.json({ url: s3Response.Location }); // Return the S3 public URL
   } catch (err) {
-    console.error('Error uploading image:', err.message);
+    console.error('Error uploading image to S3:', err.message);
     res.status(500).json({ error: 'Failed to upload image: ' + err.message });
   }
 });
@@ -154,14 +161,14 @@ router.delete('/images', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'ImageAsset not found' });
     }
 
-    const fileName = urlToRemove.split('/').pop();
-    const filePath = path.join(__dirname, '../uploads', fileName);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      console.log(`Deleted file from uploads folder: ${filePath}`);
-    } else {
-      console.warn(`File not found in uploads folder: ${filePath}`);
-    }
+    const key = urlToRemove.replace(`https://${bucketName}.s3.amazonaws.com/`, ''); // Extract S3 key
+    const params = {
+      Bucket: bucketName,
+      Key: key,
+    };
+
+    await s3.deleteObject(params).promise(); // Delete from S3
+    console.log(`Deleted image from S3: ${key}`);
 
     let updated = false;
     if (imageAsset.url === urlToRemove) {
@@ -211,7 +218,7 @@ router.delete('/images', authenticateToken, async (req, res) => {
   }
 });
 
-// PDF-related routes
+// PDF-related routes (unchanged)
 router.get('/pdfs', async (req, res) => {
   console.log('Fetching PDFs for page:', req.query.page);
   const page = req.query.page || 'default';
@@ -240,7 +247,7 @@ router.post('/pdfs', authenticateToken, upload.single('pdf'), async (req, res) =
   const url = `/uploads/${req.file.filename}`;
   const originalName = req.file.originalname;
   const page = req.headers.page || 'default';
-  const section = req.headers.section || 'dayCamp'; // Default to 'dayCamp' if not provided
+  const section = req.headers.section || 'dayCamp';
   console.log('Uploading PDF for page:', page, 'URL:', url, 'Original Name:', originalName, 'Section:', section);
 
   try {
@@ -256,7 +263,7 @@ router.post('/pdfs', authenticateToken, upload.single('pdf'), async (req, res) =
       await PdfAssets.create({ pdfs: [{ url, originalName, section }], page });
       console.log('Created new PdfAssets with PDF:', url);
     }
-    res.json({ url, section }); // Return section with the response
+    res.json({ url, section });
   } catch (err) {
     console.error('Error uploading PDF:', err.message);
     res.status(500).json({ error: 'Failed to upload PDF: ' + err.message });

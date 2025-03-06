@@ -15,7 +15,7 @@ const categorizePdf = (pdf) => {
   if (filename.includes('day-camp') || filename.includes('camp')) return 'dayCamp';
   if (filename.includes('party')) return 'party';
   if (filename.includes('waiver') || filename.includes('liability')) return 'waiver';
-  return 'dayCamp'; // Default to dayCamp if unclear
+  return 'dayCamp';
 };
 
 function Events() {
@@ -40,8 +40,7 @@ function Events() {
           throw new Error(`Failed to fetch images: ${imageResponse.status} ${await imageResponse.text()}`);
         }
         const imageData = await imageResponse.json();
-        const fullImageUrls = imageData.images.map(url => `${baseUrl}${url}`);
-        setImageUrls(fullImageUrls);
+        setImageUrls(imageData.images); // Use S3 URLs directly
         localStorage.setItem('events_imageUrls', JSON.stringify(imageData.images));
 
         const pdfResponse = await fetch(`${baseUrl}/api/assets/pdfs?page=events&t=${cacheBuster}`);
@@ -52,7 +51,7 @@ function Events() {
 
         const validPdfs = Array.isArray(pdfData.pdfs) ? pdfData.pdfs.filter(pdf => pdf.url && pdf.url.endsWith('.pdf')) : [];
         const categorizedPdfs = validPdfs.reduce((acc, pdf) => {
-          const category = pdf.section || categorizePdf(pdf); // Prioritize server-stored section
+          const category = pdf.section || categorizePdf(pdf);
           if (category === 'dayCamp') acc.dayCamp.push(pdf.url);
           else if (category === 'party') acc.party.push(pdf.url);
           else if (category === 'waiver') acc.waiver.push(pdf.url);
@@ -72,7 +71,7 @@ function Events() {
         const savedDayCamp = localStorage.getItem('events_dayCampPdf');
         const savedParty = localStorage.getItem('events_partyPdf');
         const savedWaiver = localStorage.getItem('events_waiverPdf');
-        if (savedImageUrls) setImageUrls(JSON.parse(savedImageUrls).map(url => `${baseUrl}${url}`));
+        if (savedImageUrls) setImageUrls(JSON.parse(savedImageUrls));
         if (savedDayCamp) setDayCampPdf(JSON.parse(savedDayCamp) || []);
         if (savedParty) setPartyPdf(JSON.parse(savedParty) || []);
         if (savedWaiver) setWaiverPdf(JSON.parse(savedWaiver) || []);
@@ -101,8 +100,7 @@ function Events() {
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         console.log('Updated images after upload:', updatedData);
-        const fullImageUrls = updatedData.images.map(url => `${baseUrl}${url}`);
-        setImageUrls(fullImageUrls);
+        setImageUrls(updatedData.images); // Use S3 URLs directly
         localStorage.setItem('events_imageUrls', JSON.stringify(updatedData.images));
       }
     } catch (err) {
@@ -114,17 +112,16 @@ function Events() {
   const handleImageDelete = async (urlToRemove) => {
     if (!isAdmin) return;
     setDeletingImage(urlToRemove);
-    const relativeUrl = urlToRemove.startsWith(baseUrl) ? urlToRemove.replace(baseUrl, '') : urlToRemove;
     try {
       const deleteResponse = await fetchWithToken('/api/assets/images', {
         method: 'DELETE',
-        headers: { 'Page': 'events', 'Url': relativeUrl },
+        headers: { 'Page': 'events', 'Url': urlToRemove }, // Send the full S3 URL
       });
       if (!deleteResponse.ok && deleteResponse.status !== 404) {
         const errorText = await deleteResponse.text();
         throw new Error(`Image delete failed: ${errorText}`);
       }
-      console.warn(`Image not found on server, proceeding to refresh list: ${relativeUrl}`);
+      console.warn(`Image not found on server, proceeding to refresh list: ${urlToRemove}`);
       const updatedResponse = await fetch(`${baseUrl}/api/assets/images?page=events`);
       if (!updatedResponse.ok) {
         const errorText = await updatedResponse.text();
@@ -132,8 +129,7 @@ function Events() {
       }
       const updatedData = await updatedResponse.json();
       console.log('Updated images after delete:', updatedData);
-      const fullImageUrls = updatedData.images.map(url => `${baseUrl}${url}`);
-      setImageUrls(fullImageUrls);
+      setImageUrls(updatedData.images);
       localStorage.setItem('events_imageUrls', JSON.stringify(updatedData.images));
       setError(null);
     } catch (err) {
@@ -198,7 +194,7 @@ function Events() {
       console.log('Updated PDFs after delete:', updatedData);
       const validPdfs = Array.isArray(updatedData.pdfs) ? updatedData.pdfs.filter(pdf => pdf.url && pdf.url.endsWith('.pdf')) : [];
       const categorizedPdfs = validPdfs.reduce((acc, pdf) => {
-        const category = pdf.section || categorizePdf(pdf); // Use server-stored section
+        const category = pdf.section || categorizePdf(pdf);
         if (category === 'dayCamp') acc.dayCamp.push(pdf.url);
         else if (category === 'party') acc.party.push(pdf.url);
         else if (category === 'waiver') acc.waiver.push(pdf.url);
@@ -290,7 +286,7 @@ function Events() {
                   imageUrls.map((url, index) => (
                     <div key={index} className="relative">
                       <img
-                        src={url}
+                        src={url} // Use S3 URL directly
                         alt={`Event ${index + 1}`}
                         className="w-full h-48 object-cover rounded-lg cursor-pointer"
                         onClick={() => openModal(url)}
@@ -336,7 +332,7 @@ function Events() {
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={closeModal}>
           <div className="relative">
             <img
-              src={selectedImage}
+              src={selectedImage} // Use S3 URL
               alt="Enlarged"
               className="max-h-[90vh] max-w-[90vw]"
               onError={() => handleImageError(selectedImage)}
