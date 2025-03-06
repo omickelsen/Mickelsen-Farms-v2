@@ -14,8 +14,7 @@ export const AuthProvider = ({ children }) => {
       const jwtToken = localStorage.getItem('jwtToken');
       if (jwtToken) {
         try {
-          // Verify token with backend
-          const response = await fetch('http://localhost:5000/api/verify-token', {
+          const response = await fetchWithToken('/api/verify-token', {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${jwtToken}`,
@@ -25,11 +24,12 @@ export const AuthProvider = ({ children }) => {
             const data = await response.json();
             setIsAdmin(data.isAdmin);
             setUser({ email: data.email });
-            setToken(jwtToken); // Ensure token is set
+            setToken(jwtToken);
           } else {
             throw new Error('Token verification failed');
           }
         } catch (err) {
+          console.error('Auth error:', err.message);
           setError(err.message);
           localStorage.removeItem('jwtToken');
           setToken(null);
@@ -41,9 +41,8 @@ export const AuthProvider = ({ children }) => {
     };
 
     initializeAuth();
-  }, []); // Run only on mount
+  }, []);
 
-  // Update token in localStorage and state when setToken is called
   useEffect(() => {
     if (token) {
       localStorage.setItem('jwtToken', token);
@@ -68,11 +67,16 @@ export const AuthProvider = ({ children }) => {
 
 export const fetchWithToken = async (url, options = {}) => {
   const jwtToken = localStorage.getItem('jwtToken');
-  const baseUrl = process.env.NODE_ENV === 'production'
-    ? 'https://mickelsen-family-farms.herokuapp.com'
-    : 'http://localhost:5000';
+  // Determine base URL dynamically
+  let baseUrl;
+  if (typeof window !== 'undefined') {
+    baseUrl = `${window.location.protocol}//${window.location.host}`;
+  } else if (process.env.NODE_ENV === 'production') {
+    baseUrl = 'https://mickelsenfamilyfarms.com'; // Fallback to custom domain
+  } else {
+    baseUrl = 'http://localhost:5000'; // Fallback for server-side rendering or local dev
+  }
 
-  // Only add Authorization header if jwtToken exists
   const headers = {
     ...options.headers,
   };
@@ -80,20 +84,26 @@ export const fetchWithToken = async (url, options = {}) => {
     headers['Authorization'] = `Bearer ${jwtToken}`;
   }
 
- 
-
-  // Ensure the URL is a string
   if (typeof url !== 'string') {
     throw new Error(`Invalid URL: ${url}`);
   }
 
-  // If the URL doesn't start with http, prepend baseUrl
   const finalUrl = url.startsWith('http') ? url : `${baseUrl}${url.replace(/^\//, '')}`;
+  console.log('Fetching from:', finalUrl); // Debug log
 
-  return fetch(finalUrl, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(finalUrl, {
+      ...options,
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response;
+  } catch (err) {
+    console.error('Fetch error:', err.message);
+    throw err;
+  }
 };
 
 export const useAuth = () => useContext(AuthContext);
