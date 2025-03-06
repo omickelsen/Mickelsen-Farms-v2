@@ -5,6 +5,7 @@ const PdfAssets = require('../models/PdfAssets');
 const multer = require('multer');
 const path = require('path');
 const AWS = require('aws-sdk');
+const jwt = require('jsonwebtoken');
 
 const authenticateToken = async (req, res, next) => {
   console.log('Authenticating token for:', req.url, req.method);
@@ -46,7 +47,7 @@ const getCleanFilename = (url) => {
   return filenameParts.join('-');
 };
 
-// Initial data setup (unchanged)
+// Initial data setup
 const initializeAssets = async () => {
   const pages = ['horse-boarding', 'horse-lessons', 'trail-rides', 'events', 'default', 'carousel'];
   for (const page of pages) {
@@ -78,7 +79,7 @@ const initializeAssets = async () => {
 
 initializeAssets().catch(err => console.error('Initial setup error:', err));
 
-// Image-related routes (unchanged from previous update)
+// Image-related routes
 router.get('/images', async (req, res) => {
   console.log('Fetching images for page:', req.query.page);
   const page = req.query.page || 'default';
@@ -106,18 +107,19 @@ router.post('/images', authenticateToken, upload.single('image'), async (req, re
   }
   const url = `/uploads/${req.file.originalname}-${Date.now()}`; // Unique filename
   const page = req.headers.page || 'default';
-  console.log('Uploading image for page:', page, 'URL:', url);
+  console.log('Uploading image for page:', page, 'URL:', url, 'File size:', req.file.size);
 
   const params = {
-    Bucket: bucketName,
-    Key: url.replace('/uploads/', ''), // S3 key (remove /uploads/ prefix)
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: url.replace('/uploads/', ''),
     Body: req.file.buffer,
     ContentType: req.file.mimetype,
   };
 
   try {
+    console.log('Initiating S3 upload with params:', params);
     const s3Response = await s3.upload(params).promise();
-    console.log('Image uploaded to S3:', s3Response.Location);
+    console.log('S3 upload completed:', s3Response.Location);
     const imageAsset = await ImageAssets.findOne({ page });
     if (imageAsset) {
       await ImageAssets.findOneAndUpdate(
@@ -130,9 +132,9 @@ router.post('/images', authenticateToken, upload.single('image'), async (req, re
       await ImageAssets.create({ url: s3Response.Location, urls: [s3Response.Location], page });
       console.log('Created new ImageAssets with image:', s3Response.Location);
     }
-    res.json({ url: s3Response.Location }); // Return the S3 public URL
+    res.json({ url: s3Response.Location });
   } catch (err) {
-    console.error('Error uploading image to S3:', err.message, err.stack);
+    console.error('Error during image upload:', err.message, err.stack);
     res.status(500).json({ error: 'Failed to upload image: ' + err.message });
   }
 });
@@ -158,13 +160,13 @@ router.delete('/images', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'ImageAsset not found' });
     }
 
-    const key = urlToRemove.replace(`https://${bucketName}.s3.amazonaws.com/`, ''); // Extract S3 key
+    const key = urlToRemove.replace(`https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/`, '');
     const params = {
-      Bucket: bucketName,
+      Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
     };
 
-    await s3.deleteObject(params).promise(); // Delete from S3
+    await s3.deleteObject(params).promise();
     console.log(`Deleted image from S3: ${key}`);
 
     let updated = false;
@@ -215,7 +217,7 @@ router.delete('/images', authenticateToken, async (req, res) => {
   }
 });
 
-// PDF-related routes (updated for S3)
+// PDF-related routes
 router.get('/pdfs', async (req, res) => {
   console.log('Fetching PDFs for page:', req.query.page);
   const page = req.query.page || 'default';
@@ -247,15 +249,16 @@ router.post('/pdfs', authenticateToken, upload.single('pdf'), async (req, res) =
   console.log('Uploading PDF for page:', page, 'URL:', url, 'Section:', section);
 
   const params = {
-    Bucket: bucketName,
-    Key: url.replace('/uploads/', ''), // S3 key (remove /uploads/ prefix)
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: url.replace('/uploads/', ''),
     Body: req.file.buffer,
     ContentType: req.file.mimetype,
   };
 
   try {
+    console.log('Initiating S3 upload for PDF with params:', params);
     const s3Response = await s3.upload(params).promise();
-    console.log('PDF uploaded to S3:', s3Response.Location);
+    console.log('S3 PDF upload completed:', s3Response.Location);
     const pdfAsset = await PdfAssets.findOne({ page });
     if (pdfAsset) {
       await PdfAssets.findOneAndUpdate(
@@ -270,7 +273,7 @@ router.post('/pdfs', authenticateToken, upload.single('pdf'), async (req, res) =
     }
     res.json({ url: s3Response.Location, section });
   } catch (err) {
-    console.error('Error uploading PDF to S3:', err.message, err.stack);
+    console.error('Error during PDF upload:', err.message, err.stack);
     res.status(500).json({ error: 'Failed to upload PDF: ' + err.message });
   }
 });
@@ -296,13 +299,13 @@ router.delete('/pdfs', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'PdfAsset not found' });
     }
 
-    const key = urlToRemove.replace(`https://${bucketName}.s3.amazonaws.com/`, ''); // Extract S3 key
+    const key = urlToRemove.replace(`https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/`, '');
     const params = {
-      Bucket: bucketName,
+      Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
     };
 
-    await s3.deleteObject(params).promise(); // Delete from S3
+    await s3.deleteObject(params).promise();
     console.log(`Deleted PDF from S3: ${key}`);
 
     if (pdfAsset.pdfs.some(p => p.url === urlToRemove)) {
