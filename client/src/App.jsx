@@ -13,7 +13,7 @@ import AdminHorseBoarding from './pages/AdminHorseBoarding';
 import AdminHorseLessons from './pages/AdminHorseLessons';
 import AdminTrailRides from './pages/AdminTrailRides';
 import AdminEvents from './pages/AdminEvents';
-import TestPdfs from './pages/TestPdfs'; // Adjust path as needed
+
 
 function App() {
   return (
