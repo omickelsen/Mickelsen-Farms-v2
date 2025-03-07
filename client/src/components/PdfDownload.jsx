@@ -4,22 +4,21 @@ const PdfDownload = ({ url, label }) => {
   // Log the raw URL for debugging
   console.log('PdfDownload URL:', url);
 
-  // Use the raw S3 URL directly, no need to prepend baseUrl
+  // Use the raw S3 URL directly
   const fullUrl = url;
 
-  // Ensure label is a string and clean it for the download attribute
-  const downloadLabel = label?.replace(/[^a-zA-Z0-9-_.\s]/g, '') || 'download.pdf';
+  // Clean label for display
+  const displayLabel = label?.replace(/[^a-zA-Z0-9-_.\s]/g, '') || 'View PDF';
 
   return (
     <a
       href={fullUrl}
-      download={downloadLabel} // Use the cleaned label for download
-      target="_blank" // Open in new tab to ensure browser handles PDF correctly
+      target="_blank" // Open in new tab for inline rendering or download
       rel="noopener noreferrer" // Security best practice
       className="text-teal-600 hover:text-teal-800 underline"
-      onClick={() => console.log('Downloading PDF:', fullUrl)} // Debug click event
+      onClick={() => console.log('Opening PDF:', fullUrl)} // Debug click event
     >
-      {label}
+      {displayLabel}
     </a>
   );
 };

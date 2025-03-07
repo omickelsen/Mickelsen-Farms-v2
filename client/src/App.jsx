@@ -13,6 +13,7 @@ import AdminHorseBoarding from './pages/AdminHorseBoarding';
 import AdminHorseLessons from './pages/AdminHorseLessons';
 import AdminTrailRides from './pages/AdminTrailRides';
 import AdminEvents from './pages/AdminEvents';
+import TestPdfs from './pages/TestPdfs'; // Adjust path as needed
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/horse-lessons" element={<HorseLessons />} />
               <Route path="/trail-rides" element={<TrailRides />} />
+              
               <Route
                 path="/admin"
                 element={
