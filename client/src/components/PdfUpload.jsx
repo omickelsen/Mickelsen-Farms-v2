@@ -6,7 +6,7 @@ const PdfUpload = ({ onUpload, page, section }) => {
   const { token, isAdmin } = useAuth();
 
   const onDrop = useCallback(
-    async (acceptedFiles) => {
+    async (acceptedFiles) => { // Use acceptedFiles from useDropzone
       if (!isAdmin || !token) {
         console.log('Upload prevented: Not an admin or no token');
         return;
@@ -22,10 +22,10 @@ const PdfUpload = ({ onUpload, page, section }) => {
       formData.append('pdf', file); // Matches server-side upload.single('pdf')
 
       try {
-        const response = await fetchWithToken('/api/assets/pdfs', { // Use relative path
+        const response = await fetchWithToken('/api/assets/pdfs', {
           method: 'POST',
           body: formData,
-          headers: { 
+          headers: {
             'Page': page || 'default',
             'Section': section || 'default', // Pass section in headers
           },

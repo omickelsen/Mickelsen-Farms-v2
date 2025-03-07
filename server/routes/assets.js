@@ -239,10 +239,19 @@ router.post('/pdfs', authenticateToken, upload.single('pdf'), async (req, res) =
     console.log('Unauthorized PDF upload attempt by:', req.user?.email);
     return res.status(403).json({ error: 'Admin access required' });
   }
-  if (!req.file || !req.file.buffer || !req.file.mimetype.startsWith('application/pdf')) {
-    console.log('Invalid PDF upload attempt:', req.file);
+  if (!req.file || !req.file.buffer) {
+    console.log('Invalid PDF upload attempt: No file or buffer');
+    return res.status(400).json({ error: 'No file provided' });
+  }
+  console.log('Received file:', req.file.originalname, 'MIME type:', req.file.mimetype); // Log the MIME type
+
+  // Relaxed MIME type validation: Check file extension as fallback
+  const isValidPdf = req.file.mimetype.startsWith('application/pdf') || req.file.originalname.toLowerCase().endsWith('.pdf');
+  if (!isValidPdf) {
+    console.log('Invalid PDF MIME type or extension:', req.file.mimetype, req.file.originalname);
     return res.status(400).json({ error: 'No valid PDF provided' });
   }
+
   const url = `/uploads/${req.file.originalname}-${Date.now()}`; // Unique filename
   const page = req.headers.page || 'default';
   const section = req.headers.section || 'default';
