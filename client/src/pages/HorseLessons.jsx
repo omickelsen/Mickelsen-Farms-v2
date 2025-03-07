@@ -153,6 +153,7 @@ function HorseLessons() {
         }, { ridingLevels: [], registration: [] });
         setRidingLevelsPdf(categorizedPdfs.ridingLevels);
         setRegistrationPdf(categorizedPdfs.registration);
+        console.log('Updated PDF state:', { ridingLevels: categorizedPdfs.ridingLevels, registration: categorizedPdfs.registration }); // Debug log
         localStorage.setItem('ridingLevelsPdf', JSON.stringify(categorizedPdfs.ridingLevels));
         localStorage.setItem('registrationPdf', JSON.stringify(categorizedPdfs.registration));
       }
