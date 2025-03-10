@@ -33,7 +33,9 @@ const Header = () => {
 
   const handleLoginClick = (e) => {
     e.preventDefault();
-    const backendUrl = window.location.origin; // Use the current domain
+    const backendUrl = process.env.NODE_ENV === 'production'
+      ? 'https://www.mickelsenfamilyfarms.com' // Force custom domain in production
+      : 'http://localhost:5000';
     window.location.href = `${backendUrl}/auth/google`;
   };
 
@@ -69,7 +71,7 @@ const Header = () => {
               href={item.route + item.sectionId}
               onClick={(e) => {
                 e.preventDefault();
-                handleNavClick(item.route, item.sectionId);
+                handleNavClick(item.route, sectionId);
               }}
               className="block md:inline-block py-1 md:py-0 px-1 hover:text-teal-200 text-xs md:text-base"
             >

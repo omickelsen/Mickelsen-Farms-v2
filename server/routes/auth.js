@@ -15,9 +15,8 @@ const ADMIN_EMAILS = ['omickelsen@gmail.com', 'mickelsenfamilyfarms@gmail.com', 
 
 // Redirect to Google for authentication
 router.get('/google', (req, res) => {
-  const redirectUri = process.env.NODE_ENV === 'production'
-    ? 'https://mickelsen-family-farms.herokuapp.com/auth/google/callback'
-    : 'http://localhost:5000/auth/google/callback';
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+  const redirectUri = `${protocol}://${req.headers.host}/auth/google/callback`;
   const redirectUrl = oauth2Client.generateAuthUrl({
     scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar'],
     redirect_uri: redirectUri,
@@ -30,11 +29,11 @@ router.get('/google', (req, res) => {
 router.get('/google/callback', async (req, res) => {
   const code = req.query.code;
   try {
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const redirectUri = `${protocol}://${req.headers.host}/auth/google/callback`;
     const { tokens } = await oauth2Client.getToken({
       code,
-      redirect_uri: process.env.NODE_ENV === 'production'
-        ? 'https://mickelsen-family-farms.herokuapp.com/auth/google/callback'
-        : 'http://localhost:5000/auth/google/callback',
+      redirect_uri: redirectUri,
     });
     oauth2Client.setCredentials(tokens);
 
@@ -52,27 +51,27 @@ router.get('/google/callback', async (req, res) => {
     const token = jwt.sign({ email: userEmail, isAdmin }, process.env.JWT_SECRET, { expiresIn: '1h' });
     console.log('Generated JWT:', token);
 
-   // Dynamically determine the baseUrl from the request host
-   const host = req.headers.host;
-   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-   const validHosts = ['mickelsen-family-farms.herokuapp.com', 'mickelsenfamilyfarms.com', 'www.mickelsenfamilyfarms.com'];
-   let baseUrl;
+    const host = req.headers.host;
+    console.log('Request host:', host); // Debug log
+    const validHosts = ['mickelsen-family-farms.herokuapp.com', 'mickelsenfamilyfarms.com', 'www.mickelsenfamilyfarms.com'];
+    let baseUrl;
 
-   if (process.env.NODE_ENV !== 'production') {
-     baseUrl = 'http://localhost:3000';
-   } else if (validHosts.includes(host)) {
-     baseUrl = `${protocol}://${host}`;
-   } else {
-     // Fallback to a default if the host isn't recognized
-     baseUrl = 'https://www.mickelsenfamilyfarms.com';
-   }
+    if (process.env.NODE_ENV !== 'production') {
+      baseUrl = 'http://localhost:3000';
+    } else {
+      // Prioritize custom domain
+      baseUrl = 'https://www.mickelsenfamilyfarms.com';
+      if (validHosts.includes(host) && host !== 'mickelsen-family-farms.herokuapp.com') {
+        baseUrl = `${protocol}://${host}`;
+      }
+      console.log('Redirecting to baseUrl:', baseUrl); // Debug log
+    }
 
-   res.redirect(`${baseUrl}/auth/success?token=${encodeURIComponent(token)}`);
- } catch (err) {
-   console.error('Error in Google callback:', err.message);
-   res.status(500).send('Authentication failed: ' + err.message);
-   console.log('Redirecting to:', `${baseUrl}/auth/success?token=${encodeURIComponent(token)}`);
- }
+    res.redirect(`${baseUrl}/auth/success?token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    console.error('Error in Google callback:', err.message);
+    res.status(500).send('Authentication failed: ' + err.message);
+  }
 });
 
 module.exports = router;
