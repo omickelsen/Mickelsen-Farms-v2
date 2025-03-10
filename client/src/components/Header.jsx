@@ -12,7 +12,7 @@ const Header = () => {
   const navItems = [
     { label: 'About Us', route: '/', sectionId: '#about' },
     { label: 'Services', route: '/', sectionId: '#services' },
-    { label: 'Calendar', route: '/calendar', sectionId: '#calendar' },
+    { label: 'Calendar', route: '/', sectionId: '#calendar' }, // Changed route to '/' to stay on homepage
     { label: 'Contact Us', route: '/', sectionId: '#contact' },
   ];
 
@@ -21,12 +21,15 @@ const Header = () => {
     const targetPath = route;
 
     if (currentPath === targetPath) {
+      // Already on the target path, just scroll to the section
       const element = document.getElementById(sectionId.replace('#', ''));
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }
     } else {
-      navigate(route + sectionId);
+      // Navigate to the route without the hash in the URL
+      // Pass the sectionId as state to scroll after navigation
+      navigate(route, { state: { sectionId } });
     }
     setIsMobileMenuOpen(false);
   };
@@ -53,8 +56,12 @@ const Header = () => {
   // Handle scrolling after navigation
   useEffect(() => {
     const hash = location.hash; // e.g., #about, #services
-    if (hash) {
-      const element = document.getElementById(hash.replace('#', ''));
+    const sectionIdFromState = location.state?.sectionId; // Get sectionId from navigation state
+
+    // Prioritize sectionId from state (after navigation) over hash (direct URL access)
+    const sectionId = sectionIdFromState || hash;
+    if (sectionId) {
+      const element = document.getElementById(sectionId.replace('#', ''));
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }

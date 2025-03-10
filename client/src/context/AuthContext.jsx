@@ -106,7 +106,7 @@ export const fetchWithToken = async (url, options = {}) => {
 
   // Ensure a slash is added between baseUrl and url if needed
   const finalUrl = url.startsWith('http') ? url : `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}${url.replace(/^\//, '')}`;
-  console.log('Fetching from:', finalUrl); // Debug log
+  
 
   try {
     const response = await fetch(finalUrl, {

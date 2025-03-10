@@ -52,7 +52,7 @@ router.get('/google/callback', async (req, res) => {
     console.log('Generated JWT:', token);
 
     const host = req.headers.host;
-    console.log('Request host:', host); // Debug log
+    
     const validHosts = ['mickelsen-family-farms.herokuapp.com', 'mickelsenfamilyfarms.com', 'www.mickelsenfamilyfarms.com'];
     let baseUrl;
 
@@ -64,7 +64,7 @@ router.get('/google/callback', async (req, res) => {
       if (validHosts.includes(host) && host !== 'mickelsen-family-farms.herokuapp.com') {
         baseUrl = `${protocol}://${host}`;
       }
-      console.log('Redirecting to baseUrl:', baseUrl); // Debug log
+      
     }
 
     res.redirect(`${baseUrl}/auth/success?token=${encodeURIComponent(token)}`);

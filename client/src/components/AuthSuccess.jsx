@@ -11,8 +11,7 @@ function AuthSuccess() {
     const urlParams = new URLSearchParams(location.search);
     const tokenFromUrl = urlParams.get('token');
 
-    console.log('AuthSuccess - URL Params:', location.search); // Debug log
-    console.log('AuthSuccess - Token from URL:', tokenFromUrl); // Debug log
+   
 
     if (tokenFromUrl) {
       if (tokenFromUrl !== token) {
