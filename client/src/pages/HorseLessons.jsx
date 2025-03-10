@@ -27,7 +27,6 @@ function HorseLessons() {
         throw new Error(`Failed to fetch PDFs: ${pdfResponse.status} ${await pdfResponse.text()}`);
       }
       const pdfData = await pdfResponse.json();
-      console.log('Raw PDF data from server:', pdfData);
       setPdfs(pdfData.pdfs || []);
       setError(null);
     } catch (err) {

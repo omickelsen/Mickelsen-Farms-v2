@@ -8,13 +8,13 @@ const PdfUpload = ({ onUpload, page, section }) => {
   const onDrop = useCallback(
     async (acceptedFiles) => { // Use acceptedFiles from useDropzone
       if (!isAdmin || !token) {
-        console.log('Upload prevented: Not an admin or no token');
+        // console.log('Upload prevented: Not an admin or no token');
         return;
       }
 
       const file = acceptedFiles[0]; // Take the first file
       if (!file || !file.type.startsWith('application/pdf')) {
-        console.log('Invalid file uploaded:', file ? file.type : 'No file');
+        // console.log('Invalid file uploaded:', file ? file.type : 'No file');
         return;
       }
 
@@ -37,7 +37,7 @@ const PdfUpload = ({ onUpload, page, section }) => {
         }
 
         const data = await response.json();
-        console.log('PDF upload successful, response:', data);
+        // console.log('PDF upload successful, response:', data);
         if (onUpload && data.url) {
           onUpload(data.url, data.section); // Pass the S3 URL and section to the parent
         } else {

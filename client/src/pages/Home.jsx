@@ -4,11 +4,13 @@ import ServicesSection from '../components/ServicesSection';
 import CarouselComponent from '../components/CarouselComponent';
 import HeroSection from '../components/HeroSection';
 import Header from '../components/Header';
+import { useAuth } from '../context/AuthContext';
 
 function Home() {
   const [request, setRequest] = useState('');
   const [message, setMessage] = useState('');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const { token, user } = useAuth(); // Add useAuth to subscribe to context changes
 
   const handleRequestSubmit = async (e) => {
     e.preventDefault();
@@ -34,6 +36,11 @@ function Home() {
     <div className="min-h-screen bg-gray-100">
       <HeroSection />
       <Header />
+      {token && user && (
+        <div className="text-center py-4 bg-green-100 text-green-800">
+          Welcome, {user.email}! You are logged in.
+        </div>
+      )}
       <section id="about" className="py-10 md:py-16">
         <div className="container">
           <h2 className="section-title">About Us</h2>
