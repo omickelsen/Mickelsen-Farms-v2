@@ -17,9 +17,14 @@ const Header = () => {
   ];
 
   const handleNavClick = (route, sectionId) => {
-    if (location.pathname === '/') {
+    const currentPath = location.pathname;
+    const targetPath = route;
+
+    if (currentPath === targetPath) {
       const element = document.getElementById(sectionId.replace('#', ''));
-      if (element) element.scrollIntoView({ behavior: 'smooth' });
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
     } else {
       navigate(route + sectionId);
     }
@@ -34,7 +39,7 @@ const Header = () => {
   const handleLoginClick = (e) => {
     e.preventDefault();
     const backendUrl = process.env.NODE_ENV === 'production'
-      ? 'https://www.mickelsenfamilyfarms.com' // Force custom domain in production
+      ? 'https://www.mickelsenfamilyfarms.com'
       : 'http://localhost:5000';
     window.location.href = `${backendUrl}/auth/google`;
   };
@@ -44,6 +49,17 @@ const Header = () => {
     navigate('/');
     setIsMobileMenuOpen(false);
   };
+
+  // Handle scrolling after navigation
+  useEffect(() => {
+    const hash = location.hash; // e.g., #about, #services
+    if (hash) {
+      const element = document.getElementById(hash.replace('#', ''));
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [location]); // Run when location changes
 
   useEffect(() => {
     const handleScroll = () => setIsHeaderVisible(window.scrollY <= 50);
@@ -71,7 +87,7 @@ const Header = () => {
               href={item.route + item.sectionId}
               onClick={(e) => {
                 e.preventDefault();
-                handleNavClick(item.route, sectionId);
+                handleNavClick(item.route, item.sectionId);
               }}
               className="block md:inline-block py-1 md:py-0 px-1 hover:text-teal-200 text-xs md:text-base"
             >
@@ -94,7 +110,7 @@ const Header = () => {
         <div className="hidden md:flex items-center space-x-2">
           {!token && (
             <button onClick={handleLoginClick} className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm md:text-base">
-              Login
+                Login
             </button>
           )}
           {token && (
