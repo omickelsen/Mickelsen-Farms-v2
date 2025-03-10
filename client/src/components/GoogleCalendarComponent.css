@@ -1,39 +1,55 @@
 .calendar-section {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.5rem;
+  overflow: visible; /* Ensure parent doesn't clip content */
+}
+
+.calendar-iframe-container {
+  position: relative;
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: 0;
+  padding-bottom: 75%; /* 4:3 aspect ratio for desktop */
+  overflow-y: auto; /* Enable vertical scrolling */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+.calendar-iframe-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block; /* Remove any inline spacing issues */
+}
+
+@media (max-width: 640px) {
+  .calendar-section {
+    padding: 0.25rem;
+    overflow: visible;
   }
-  
+
   .calendar-iframe-container {
-    position: relative;
-    width: 100%;
-    overflow: hidden;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    height: 0;
-    padding-bottom: 75%; /* 4:3 aspect ratio for desktop */
+    border: none;
+    box-shadow: none;
+    height: auto; /* Remove aspect ratio on mobile */
+    min-height: 600px; /* Larger calendar on mobile */
+    padding-bottom: 0; /* Disable aspect ratio on mobile */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  
+
   .calendar-iframe-container iframe {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    position: static; /* Reset positioning for mobile */
+    min-height: 600px; /* Match the container */
+    height: auto; /* Allow content to dictate height */
   }
-  
-  @media (max-width: 640px) {
-    .calendar-section {
-      padding: 0.25rem;
-    }
-    .calendar-iframe-container {
-      border: none;
-      box-shadow: none;
-      padding-bottom: 100%; /* Square aspect ratio on mobile */
-    }
-  }
-  
-  .btn-primary {
-    @apply bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors duration-300;
-  }
+}
+
+.btn-primary {
+  @apply bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors duration-300;
+}
