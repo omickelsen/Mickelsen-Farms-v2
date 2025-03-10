@@ -33,9 +33,7 @@ const Header = () => {
 
   const handleLoginClick = (e) => {
     e.preventDefault();
-    const backendUrl = process.env.NODE_ENV === 'production'
-      ? window.location.origin  // Use current domain (e.g., www.mickelsenfamilyfarms.com)
-      : 'http://localhost:5000';
+    const backendUrl = window.location.origin; // Use the current domain
     window.location.href = `${backendUrl}/auth/google`;
   };
 
