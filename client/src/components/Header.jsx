@@ -32,9 +32,9 @@ const Header = () => {
   };
 
   const handleLoginClick = (e) => {
-    e.preventDefault(); // Prevent page refresh
+    e.preventDefault();
     const backendUrl = process.env.NODE_ENV === 'production'
-      ? 'https://mickelsen-family-farms.herokuapp.com'
+      ? window.location.origin  // Use current domain (e.g., www.mickelsenfamilyfarms.com)
       : 'http://localhost:5000';
     window.location.href = `${backendUrl}/auth/google`;
   };
