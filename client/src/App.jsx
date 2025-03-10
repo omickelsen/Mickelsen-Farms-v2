@@ -101,11 +101,13 @@ function AuthSuccess() {
     const tokenFromUrl = urlParams.get('token');
     
     if (tokenFromUrl && tokenFromUrl !== token) {
-      localStorage.setItem('jwtToken', tokenFromUrl); // Store the JWT
-      setToken(tokenFromUrl); // Update context state
-      
+      localStorage.setItem('jwtToken', tokenFromUrl);
+      setToken(tokenFromUrl);
     }
-    navigate('/', { replace: true }); // Redirect to home after setting token
+    // Explicitly redirect to the root of the custom domain
+    window.location.href = 'https://www.mickelsenfamilyfarms.com/'; // Use full URL instead of navigate
+    // Or if you want to keep using navigate:
+    // navigate('/', { replace: true });
   }, [token, setToken, location, navigate]);
 
   return <p>Authenticating... Please wait.</p>;
