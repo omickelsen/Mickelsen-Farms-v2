@@ -52,14 +52,26 @@ router.get('/google/callback', async (req, res) => {
     const token = jwt.sign({ email: userEmail, isAdmin }, process.env.JWT_SECRET, { expiresIn: '1h' });
     console.log('Generated JWT:', token);
 
-    const baseUrl = process.env.NODE_ENV === 'production'
-      ? 'https://mickelsen-family-farms.herokuapp.com'
-      : 'http://localhost:3000';
-    res.redirect(`${baseUrl}/auth/success?token=${encodeURIComponent(token)}`);
-  } catch (err) {
-    console.error('Error in Google callback:', err.message);
-    res.status(500).send('Authentication failed: ' + err.message);
-  }
+   // Dynamically determine the baseUrl from the request host
+   const host = req.headers.host;
+   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+   const validHosts = ['mickelsen-family-farms.herokuapp.com', 'mickelsenfamilyfarms.com', 'www.mickelsenfamilyfarms.com'];
+   let baseUrl;
+
+   if (process.env.NODE_ENV !== 'production') {
+     baseUrl = 'http://localhost:3000';
+   } else if (validHosts.includes(host)) {
+     baseUrl = `${protocol}://${host}`;
+   } else {
+     // Fallback to a default if the host isn't recognized
+     baseUrl = 'https://www.mickelsenfamilyfarms.com';
+   }
+
+   res.redirect(`${baseUrl}/auth/success?token=${encodeURIComponent(token)}`);
+ } catch (err) {
+   console.error('Error in Google callback:', err.message);
+   res.status(500).send('Authentication failed: ' + err.message);
+ }
 });
 
 module.exports = router;
