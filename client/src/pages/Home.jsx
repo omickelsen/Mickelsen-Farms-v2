@@ -10,7 +10,9 @@ function Home() {
   const [request, setRequest] = useState('');
   const [message, setMessage] = useState('');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const { token, user } = useAuth(); // Add useAuth to subscribe to context changes
+  const { token, user, renderTrigger } = useAuth();
+
+  console.log('Home rendered with token:', token, 'renderTrigger:', renderTrigger);
 
   const handleRequestSubmit = async (e) => {
     e.preventDefault();
@@ -33,7 +35,7 @@ function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100" key={renderTrigger}>
       <HeroSection />
       <Header />
       {token && user && (
@@ -72,24 +74,6 @@ function Home() {
           </div>
         </div>
       </section>
-
-      {/* <section className="py-10 md:py-16 bg-gray-100">
-        <div className="container">
-          <h3 className="text-2xl font-bold text-center mb-4">Submit a Request</h3>
-          <form onSubmit={handleRequestSubmit} className="max-w-md mx-auto">
-            <textarea
-              value={request}
-              onChange={(e) => setRequest(e.target.value)}
-              placeholder="Enter your request"
-              className="w-full p-2 mb-4 border rounded"
-            />
-            <button type="submit" className="btn-primary">
-              Submit
-            </button>
-            {message && <p className="mt-2 text-gray-700">{message}</p>}
-          </form>
-        </div>
-      </section> */}
     </div>
   );
 }
