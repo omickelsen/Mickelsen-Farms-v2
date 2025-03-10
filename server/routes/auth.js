@@ -71,6 +71,7 @@ router.get('/google/callback', async (req, res) => {
  } catch (err) {
    console.error('Error in Google callback:', err.message);
    res.status(500).send('Authentication failed: ' + err.message);
+   console.log('Redirecting to:', `${baseUrl}/auth/success?token=${encodeURIComponent(token)}`);
  }
 });
 

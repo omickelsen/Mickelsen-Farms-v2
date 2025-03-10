@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import Header from './components/Header';
 import Home from './pages/Home';
 import HorseBoarding from './pages/HorseBoarding';
@@ -13,7 +13,7 @@ import AdminHorseBoarding from './pages/AdminHorseBoarding';
 import AdminHorseLessons from './pages/AdminHorseLessons';
 import AdminTrailRides from './pages/AdminTrailRides';
 import AdminEvents from './pages/AdminEvents';
-
+import AuthSuccess from './components/AuthSuccess'; // Import the new component
 
 function App() {
   return (
@@ -28,7 +28,6 @@ function App() {
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/horse-lessons" element={<HorseLessons />} />
               <Route path="/trail-rides" element={<TrailRides />} />
-              
               <Route
                 path="/admin"
                 element={
@@ -69,7 +68,7 @@ function App() {
                   </RequireAdmin>
                 }
               />
-              <Route path="/auth/success" element={<AuthSuccess />} /> {/* Exact match */}
+              <Route path="/auth/success" element={<AuthSuccess />} /> {/* Use the imported component */}
               <Route path="*" element={<Home />} /> {/* Fallback to Home */}
             </Routes>
           </main>
@@ -81,36 +80,10 @@ function App() {
 
 function RequireAdmin({ children }) {
   const { token, isAdmin, loading, error } = useAuth();
-
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error}</p>;
-  if (!token || !isAdmin) {
-    return <Navigate to="/" replace />;
-  }
+  if (!token || !isAdmin) return <Navigate to="/" replace />;
   return children;
-}
-
-// Component to handle the redirect success
-function AuthSuccess() {
-  const { token, setToken } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const tokenFromUrl = urlParams.get('token');
-    
-    if (tokenFromUrl && tokenFromUrl !== token) {
-      localStorage.setItem('jwtToken', tokenFromUrl);
-      setToken(tokenFromUrl);
-    }
-    // Explicitly redirect to the root of the custom domain
-    window.location.href = 'https://www.mickelsenfamilyfarms.com/'; // Use full URL instead of navigate
-    // Or if you want to keep using navigate:
-    // navigate('/', { replace: true });
-  }, [token, setToken, location, navigate]);
-
-  return <p>Authenticating... Please wait.</p>;
 }
 
 export default App;
