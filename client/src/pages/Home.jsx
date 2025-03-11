@@ -73,7 +73,7 @@ function Home() {
           <EditableSection
             page="contact"
             field="text"
-            initialContent="1339 North 500 East, Pleasant Grove, UT 84062\nEmail: mickelsenfamilyfarms@gmail.com\nJoDee: +1 801-372-2070 | AL: +1 801-360-6071 | Nik: +1 801-857-8636"
+            initialContent="1393 North 500 East, Pleasant Grove, UT 84062\nEmail: mickelsenfamilyfarms@gmail.com\nJoDee: +1 801-372-2070 | AL: +1 801-360-6071 | Nik: +1 801-857-8636"
           />
           <GoogleMapComponent />
         </div>

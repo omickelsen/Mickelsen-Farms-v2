@@ -44,7 +44,7 @@ function TrailRides() {
     const files = event.target.files;
     if (!files.length) return;
     const formData = new FormData();
-    Array.from(files).forEach((file) => formData.append('image', file));
+    Array.from(files).forEach((file) => formData.append('images', file)); // Updated to 'images'
     try {
       const uploadResponse = await fetchWithToken('/api/assets/images', {
         method: 'POST',

@@ -36,11 +36,11 @@ AWS.config.update({
 const s3 = new AWS.S3();
 const bucketName = process.env.AWS_BUCKET_NAME;
 
-// Multer configuration (use memory storage for S3 upload)
+// Multer configuration
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Helper function to extract filename
+// Helper function
 const getCleanFilename = (url) => {
   const parts = url.substring(url.lastIndexOf('/') + 1).split('-');
   const filenameParts = parts.length > 1 && !isNaN(parts[0]) ? parts.slice(1) : parts;
@@ -96,46 +96,51 @@ router.get('/images', async (req, res) => {
   }
 });
 
-router.post('/images', authenticateToken, upload.single('image'), async (req, res) => {
+router.post('/images', authenticateToken, upload.array('images'), async (req, res) => {
   if (!req.isAdmin) {
     console.log('Unauthorized image upload attempt by:', req.user?.email);
     return res.status(403).json({ error: 'Admin access required' });
   }
-  if (!req.file || !req.file.buffer) {
-    console.log('Invalid image upload attempt:', req.file);
-    return res.status(400).json({ error: 'No valid image provided' });
+  if (!req.files || req.files.length === 0) {
+    console.log('Invalid image upload attempt:', req.files);
+    return res.status(400).json({ error: 'No valid images provided' });
   }
-  const url = `/uploads/${req.file.originalname}-${Date.now()}`; // Unique filename
   const page = req.headers.page || 'default';
-  console.log('Uploading image for page:', page, 'URL:', url, 'File size:', req.file.size);
+  console.log('Uploading multiple images for page:', page, 'Number of files:', req.files.length);
 
-  const params = {
-    Bucket: process.env.AWS_BUCKET_NAME,
-    Key: url.replace('/uploads/', ''),
-    Body: req.file.buffer,
-    ContentType: req.file.mimetype,
-  };
+  const uploadPromises = req.files.map(async (file) => {
+    const url = `/uploads/${file.originalname}-${Date.now()}`;
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: url.replace('/uploads/', ''),
+      Body: file.buffer,
+      ContentType: file.mimetype,
+    };
 
-  try {
     console.log('Initiating S3 upload with params:', params);
     const s3Response = await s3.upload(params).promise();
     console.log('S3 upload completed:', s3Response.Location);
+    return s3Response.Location;
+  });
+
+  try {
+    const uploadedUrls = await Promise.all(uploadPromises);
     const imageAsset = await ImageAssets.findOne({ page });
     if (imageAsset) {
       await ImageAssets.findOneAndUpdate(
         { page },
-        { $push: { urls: s3Response.Location }, $set: { url: s3Response.Location } },
+        { $push: { urls: { $each: uploadedUrls } }, $set: { url: uploadedUrls[0] } },
         { new: true, runValidators: true }
       );
-      console.log('Updated ImageAssets with new image:', s3Response.Location);
+      console.log('Updated ImageAssets with new images:', uploadedUrls);
     } else {
-      await ImageAssets.create({ url: s3Response.Location, urls: [s3Response.Location], page });
-      console.log('Created new ImageAssets with image:', s3Response.Location);
+      await ImageAssets.create({ url: uploadedUrls[0], urls: uploadedUrls, page });
+      console.log('Created new ImageAssets with images:', uploadedUrls);
     }
-    res.json({ url: s3Response.Location });
+    res.json({ urls: uploadedUrls });
   } catch (err) {
     console.error('Error during image upload:', err.message, err.stack);
-    res.status(500).json({ error: 'Failed to upload image: ' + err.message });
+    res.status(500).json({ error: 'Failed to upload images: ' + err.message });
   }
 });
 
@@ -243,16 +248,15 @@ router.post('/pdfs', authenticateToken, upload.single('pdf'), async (req, res) =
     console.log('Invalid PDF upload attempt: No file or buffer');
     return res.status(400).json({ error: 'No file provided' });
   }
-  console.log('Received file:', req.file.originalname, 'MIME type:', req.file.mimetype); // Log the MIME type
+  console.log('Received file:', req.file.originalname, 'MIME type:', req.file.mimetype);
 
-  // Relaxed MIME type validation: Check file extension as fallback
   const isValidPdf = req.file.mimetype.startsWith('application/pdf') || req.file.originalname.toLowerCase().endsWith('.pdf');
   if (!isValidPdf) {
     console.log('Invalid PDF MIME type or extension:', req.file.mimetype, req.file.originalname);
     return res.status(400).json({ error: 'No valid PDF provided' });
   }
 
-  const url = `/uploads/${req.file.originalname}-${Date.now()}`; // Unique filename
+  const url = `/uploads/${req.file.originalname}-${Date.now()}`;
   const page = req.headers.page || 'default';
   const section = req.headers.section || 'default';
   console.log('Uploading PDF for page:', page, 'URL:', url, 'Section:', section);

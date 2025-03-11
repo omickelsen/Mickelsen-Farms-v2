@@ -13,7 +13,7 @@ const ImageUpload = ({ onUpload, page }) => {
       }
 
       const formData = new FormData();
-      acceptedFiles.forEach((file) => formData.append('image', file));
+      acceptedFiles.forEach((file) => formData.append('images', file));
 
       try {
         const response = await fetchWithToken('/api/assets/images', {
@@ -26,19 +26,19 @@ const ImageUpload = ({ onUpload, page }) => {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Failed to upload image: ${errorText} (Status: ${response.status})`);
+          throw new Error(`Failed to upload images: ${errorText} (Status: ${response.status})`);
         }
 
         const data = await response.json();
-        console.log('Image upload successful, response:', data);
-        if (onUpload && data.url) {
-          onUpload(data.url); // Pass the full S3 URL to onUpload
+        console.log('Images upload successful, response:', data);
+        if (onUpload && data.urls) {
+          onUpload(data.urls);
         } else {
-          throw new Error('No URL returned from server');
+          throw new Error('No URLs returned from server');
         }
       } catch (err) {
         console.error('Image upload error:', err.message);
-        alert(`Image upload failed: ${err.message}`); // Notify user of failure
+        alert(`Image upload failed: ${err.message}`);
       }
     },
     [token, isAdmin, onUpload, page]
@@ -46,8 +46,8 @@ const ImageUpload = ({ onUpload, page }) => {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: 'image/*', // Restrict to image files
-    multiple: true,   // Allow multiple image uploads
+    accept: 'image/*',
+    multiple: true,
   });
 
   return isAdmin ? (

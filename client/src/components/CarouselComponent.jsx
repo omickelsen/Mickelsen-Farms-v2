@@ -34,7 +34,6 @@ const CarouselComponent = ({
       }
     };
 
-    // Fetch images whenever isAdmin or token changes (e.g., after login)
     fetchImages();
   }, [isAdmin, token]);
 
@@ -60,11 +59,11 @@ const CarouselComponent = ({
       return;
     }
 
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files.length) return;
 
     const formData = new FormData();
-    formData.append('image', file);
+    Array.from(files).forEach((file) => formData.append('images', file));
 
     try {
       const uploadResponse = await fetchWithToken(
@@ -78,22 +77,21 @@ const CarouselComponent = ({
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
-        throw new Error(`Failed to upload image: ${errorText}`);
+        throw new Error(`Failed to upload images: ${errorText}`);
       }
 
       const updatedResponse = await fetch('/api/assets/images?page=carousel');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         console.log('Updated images after upload:', updatedData);
-        // Use S3 URLs directly
         setOriginalImages(updatedData.images || []);
         setImages(updatedData.images || []);
       } else {
         throw new Error('Failed to update carousel images.');
       }
     } catch (err) {
-      console.error('Error uploading carousel image:', err);
-      setError(`Failed to upload image: ${err.message}`);
+      console.error('Error uploading carousel images:', err);
+      setError(`Failed to upload images: ${err.message}`);
     }
   };
 
@@ -104,7 +102,7 @@ const CarouselComponent = ({
     }
 
     setDeletingImage(index);
-    const urlToRemove = images[index]; // Use the full S3 URL
+    const urlToRemove = images[index];
 
     try {
       const response = await fetchWithToken(
@@ -113,7 +111,7 @@ const CarouselComponent = ({
           method: 'DELETE',
           headers: {
             'Page': 'carousel',
-            'Url': urlToRemove, // Send the full S3 URL
+            'Url': urlToRemove,
           },
         }
       );
@@ -126,7 +124,6 @@ const CarouselComponent = ({
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         console.log('Updated images after delete:', updatedData);
-        // Use S3 URLs directly
         setOriginalImages(updatedData.images || []);
         setImages(updatedData.images || []);
         if (currentImageIndex >= updatedData.images.length) {
