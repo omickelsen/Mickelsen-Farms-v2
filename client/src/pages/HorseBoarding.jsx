@@ -4,6 +4,7 @@ import PdfUpload from '../components/PdfUpload';
 import PdfDownload from '../components/PdfDownload';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
 import Header from '../components/Header';
+import StatusIndicator from '../components/StatusIndicator'; // Import the new component
 
 function HorseBoarding() {
   const { isAdmin, token } = useAuth() || {};
@@ -129,6 +130,7 @@ function HorseBoarding() {
       <Header />
       <div className="py-12 px-4 sm:px-6 lg:px-8">
         <h2 className="text-4xl font-bold text-center text-teal-700 mb-8">Horse Boarding</h2>
+        <StatusIndicator page="horse-boarding" initialStatus="Currently we have no availability to new boarders..." /> {/* Add the component */}
         {error && <div className="text-red-600 text-center mb-6 bg-red-100 p-4 rounded-lg">{error}</div>}
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
