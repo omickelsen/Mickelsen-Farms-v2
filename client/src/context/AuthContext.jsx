@@ -8,12 +8,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [renderTrigger, setRenderTrigger] = useState(0);
 
   useEffect(() => {
     const initializeAuth = async () => {
       const jwtToken = localStorage.getItem('jwtToken');
-      console.log('Initializing auth with token:', jwtToken);
+      
       if (jwtToken) {
         try {
           const response = await fetchWithToken('/api/verify-token', {
@@ -26,8 +25,8 @@ export const AuthProvider = ({ children }) => {
             const data = await response.json();
             setIsAdmin(data.isAdmin);
             setUser({ email: data.email });
-            setToken(jwtToken);
-            console.log('Auth initialized successfully for:', data.email);
+            setToken(jwtToken); // This will sync with localStorage via the next effect
+
           } else {
             throw new Error('Token verification failed');
           }
@@ -44,18 +43,17 @@ export const AuthProvider = ({ children }) => {
     };
 
     initializeAuth();
-  }, []);
+  }, []); // Empty dependency array ensures this runs once on mount
 
+  // Sync token with localStorage without triggering re-renders unnecessarily
   useEffect(() => {
-    console.log('Token updated in context:', token);
     if (token) {
       localStorage.setItem('jwtToken', token);
-      setRenderTrigger(prev => prev + 1);
     } else {
       localStorage.removeItem('jwtToken');
-      setRenderTrigger(prev => prev + 1);
     }
-  }, [token]);
+    
+  }, [token]); // Only runs when token changes
 
   const logout = () => {
     localStorage.removeItem('jwtToken');
@@ -64,8 +62,18 @@ export const AuthProvider = ({ children }) => {
     setIsAdmin(false);
   };
 
+  const value = {
+    token,
+    setToken,
+    user,
+    logout,
+    loading,
+    error,
+    isAdmin,
+  };
+
   return (
-    <AuthContext.Provider value={{ token, setToken, user, logout, loading, error, isAdmin, renderTrigger }}>
+    <AuthContext.Provider value={value}>
       {loading ? <p>Loading authentication...</p> : error ? <p>Error: {error}</p> : children}
     </AuthContext.Provider>
   );
@@ -100,7 +108,7 @@ export const fetchWithToken = async (url, options = {}) => {
   }
 
   const finalUrl = url.startsWith('http') ? url : `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}${url.replace(/^\//, '')}`;
-  console.log('Fetching from:', finalUrl);
+  
 
   try {
     const response = await fetch(finalUrl, {

@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import Header from './components/Header';
 import Home from './pages/Home';
 import HorseBoarding from './pages/HorseBoarding';
 import Events from './pages/Events';

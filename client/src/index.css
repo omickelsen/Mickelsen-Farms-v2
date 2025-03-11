@@ -1,3 +1,5 @@
+/* Import React Quill CSS */
+@import 'react-quill/dist/quill.snow.css';
 
 /* Tailwind Directives */
 @tailwind base;
@@ -24,11 +26,55 @@
   }
 
   .card {
-    @apply bg-white shadow-md rounded-lg p-6 hover:shadow-lg transition-shadow duration-300;
+    @apply bg-gray-800 text-white shadow-md rounded-lg p-6 hover:shadow-lg transition-shadow duration-300;
   }
 
   .section-title {
     @apply text-4xl font-bold text-center mb-8 text-gray-900;
+  }
+
+  /* Style the Quill editor container with higher specificity */
+  .ql-container.ql-container {
+    @apply border border-gray-300 rounded-lg !important;
+  }
+
+  /* Style the Quill toolbar with higher specificity */
+  .ql-toolbar.ql-toolbar {
+    @apply bg-gray-800 border border-gray-300 rounded-t-lg text-white !important;
+  }
+
+  /* Style the Quill editor content area with higher specificity and inline-like override */
+  .ql-editor.ql-editor {
+    @apply min-h-[150px] p-4 bg-white text-lg !important; /* Increased font size to text-lg (1.125rem or 18px) */
+    color: #1f2937 !important; /* Darker text */
+    background-color: #ffffff !important; /* Explicit white background */
+    line-height: 1.6 !important; /* Improved line spacing for readability */
+  }
+
+  /* Style the rendered HTML content (e.g., in read-only mode) */
+  .ql-content {
+    @apply prose max-w-none text-gray-950;
+  }
+
+  /* Ensure buttons in the toolbar match your app's design */
+  .ql-toolbar .ql-formats button {
+    @apply text-white hover:text-teal-300 !important;
+  }
+
+  /* Style active toolbar buttons */
+  .ql-toolbar .ql-active {
+    @apply text-teal-300 !important;
+  }
+
+  /* Ensure toolbar icons are visible */
+  .ql-toolbar .ql-picker-label,
+  .ql-toolbar .ql-picker-item {
+    @apply text-white !important;
+  }
+
+  /* Ensure dropdowns and color pickers are visible */
+  .ql-toolbar .ql-picker-options {
+    @apply bg-white border-gray-300 text-gray-800 !important;
   }
 }
 
@@ -79,18 +125,9 @@
   .card {
     @apply p-4;
   }
-}
 
-@media (prefers-color-scheme: dark) {
-  body {
-    @apply bg-gray-900 text-gray-200;
-  }
-
-  .card {
-    @apply bg-gray-800;
-  }
-
-  .btn-primary {
-    @apply bg-teal-500 hover:bg-teal-600;
+  /* Adjust Quill editor for smaller screens */
+  .ql-editor.ql-editor {
+    @apply min-h-[100px] p-2 text-base; /* Reduced to text-base (1rem or 16px) for mobile */
   }
 }

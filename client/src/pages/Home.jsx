@@ -6,6 +6,7 @@ import HeroSection from '../components/HeroSection';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
 import EditableSection from '../components/EditableSection'; // Adjust path as needed
+import GoogleMapComponent from '../components/GoogleMapComponent';
 
 function Home() {
   const [request, setRequest] = useState('');
@@ -13,7 +14,6 @@ function Home() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { token, user } = useAuth();
 
-  console.log('Home rendered with token:', token, 'user:', user);
 
   const handleRequestSubmit = async (e) => {
     e.preventDefault();
@@ -75,6 +75,7 @@ function Home() {
             field="text"
             initialContent="1339 North 500 East, Pleasant Grove, UT 84062\nEmail: mickelsenfamilyfarms@gmail.com\nJoDee: +1 801-372-2070 | AL: +1 801-360-6071 | Nik: +1 801-857-8636"
           />
+          <GoogleMapComponent />
         </div>
       </section>
     </div>

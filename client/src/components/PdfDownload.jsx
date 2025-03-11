@@ -1,8 +1,7 @@
 import React from 'react';
 
 const PdfDownload = ({ url, label }) => {
-  // Log the raw URL for debugging
-  console.log('PdfDownload URL:', url);
+
 
   // Use the raw S3 URL directly
   const fullUrl = url;

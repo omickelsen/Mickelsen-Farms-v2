@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
 
 const EditableSection = ({ page, initialContent, field }) => {
   const { token, isAdmin } = useAuth() || {};
-  const [content, setContent] = useState(initialContent); // Start with initialContent
+  const [content, setContent] = useState(initialContent);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Load content from database on mount and refresh
   useEffect(() => {
     const fetchContent = async () => {
       setIsLoading(true);
@@ -17,9 +18,9 @@ const EditableSection = ({ page, initialContent, field }) => {
         const response = await fetch(`/api/content/${page}`);
         if (response.ok) {
           const data = await response.json();
-          const newContent = data.content?.[field] || initialContent; // Use specific field from server
+          const newContent = data.content?.[field] || initialContent;
           setContent(newContent);
-          localStorage.setItem(`content_${page}_${field}`, JSON.stringify(newContent)); // Store per field
+          localStorage.setItem(`content_${page}_${field}`, JSON.stringify(newContent));
         } else {
           console.warn(`Fetch failed with status ${response.status}, using local storage for ${page}, ${field}`);
           const cachedContent = localStorage.getItem(`content_${page}_${field}`);
@@ -37,7 +38,6 @@ const EditableSection = ({ page, initialContent, field }) => {
     fetchContent();
   }, [page, field, initialContent]);
 
-  // Handle save
   const handleSave = async () => {
     if (!isAdmin || !token) {
       setContent(content);
@@ -48,7 +48,7 @@ const EditableSection = ({ page, initialContent, field }) => {
     }
     setIsLoading(true);
     const updatedContent = content;
-    localStorage.setItem(`content_${page}_${field}`, JSON.stringify(updatedContent)); // Save locally first
+    localStorage.setItem(`content_${page}_${field}`, JSON.stringify(updatedContent));
     try {
       const response = await fetchWithToken(
         `/api/content/${page}`,
@@ -82,32 +82,54 @@ const EditableSection = ({ page, initialContent, field }) => {
 
   if (isLoading) return <p>Loading content...</p>;
 
+  const modules = {
+    toolbar: [
+      [{ header: [1, 2, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      [{ color: [] }, { background: [] }],
+      [{ align: [] }],
+      ['clean'],
+    ],
+  };
+
+  const formats = [
+    'header', 'bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'color', 'background', 'align',
+  ];
+
   return (
     <div className="p-4 bg-white rounded-lg shadow-md">
       {isEditing ? (
         <>
-          <textarea
-            value={content ?? initialContent}
-            onChange={(e) => setContent(e.target.value)}
-            className="w-full p-2 border rounded mb-2 text-gray-900"
-            rows="4"
+          <ReactQuill
+            value={content || initialContent}
+            onChange={setContent}
+            modules={modules}
+            formats={formats}
+            className="mb-4 text-gray-900"
+            placeholder="Edit content here..."
           />
           <button
             onClick={handleSave}
             className="bg-teal-600 text-white p-2 rounded mr-2"
+            disabled={isLoading}
           >
-            Save
+            {isLoading ? 'Saving...' : 'Save'}
           </button>
           <button
             onClick={() => setIsEditing(false)}
             className="bg-gray-500 text-white p-2 rounded"
+            disabled={isLoading}
           >
             Cancel
           </button>
         </>
       ) : isAdmin ? (
         <>
-          <p className="text-gray-700">{content ?? initialContent}</p>
+          <div
+            className="ql-content"
+            dangerouslySetInnerHTML={{ __html: content || initialContent }}
+          />
           <button
             onClick={() => setIsEditing(true)}
             className="mt-2 bg-blue-600 text-white p-2 rounded"
@@ -116,7 +138,10 @@ const EditableSection = ({ page, initialContent, field }) => {
           </button>
         </>
       ) : (
-        <p className="text-gray-700">{content ?? initialContent}</p>
+        <div
+          className="ql-content"
+          dangerouslySetInnerHTML={{ __html: content || initialContent }}
+        />
       )}
       {error && <div className="text-red-500 mt-2">{error}</div>}
       {success && <div className="text-green-500 mt-2">{success}</div>}

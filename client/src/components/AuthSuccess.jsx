@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function AuthSuccess() {
-  const { token, setToken } = useAuth();
+  const { setToken } = useAuth(); // Removed token from destructuring to avoid dependency
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -11,15 +11,15 @@ function AuthSuccess() {
     const urlParams = new URLSearchParams(location.search);
     const tokenFromUrl = urlParams.get('token');
 
-   
-
     if (tokenFromUrl) {
-      if (tokenFromUrl !== token) {
+      // Only set the token if it differs from what's in localStorage
+      const currentToken = localStorage.getItem('jwtToken');
+      if (tokenFromUrl !== currentToken) {
         localStorage.setItem('jwtToken', tokenFromUrl);
         setToken(tokenFromUrl);
-        console.log('AuthSuccess - Token set:', tokenFromUrl);
+        
       } else {
-        console.log('AuthSuccess - Token already set, no change needed');
+        
       }
     } else {
       console.error('AuthSuccess - No token found in URL');
@@ -31,7 +31,7 @@ function AuthSuccess() {
     }, 100); // Small delay to allow state to update
 
     return () => clearTimeout(timer); // Cleanup timer
-  }, [token, setToken, location, navigate]);
+  }, [location, navigate, setToken]); // Removed token from dependencies
 
   return <p>Authenticating... Please wait.</p>;
 }
