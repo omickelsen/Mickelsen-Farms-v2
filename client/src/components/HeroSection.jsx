@@ -18,7 +18,6 @@ const HeroSection = () => {
           throw new Error(`Failed to fetch hero background: ${response.status} ${await response.text()}`);
         }
         const data = await response.json();
-        // Use S3 URLs directly without prepending baseUrl
         setImages(data.images || []);
         setBackgroundImage(data.images[0] || '/path-to-farm-image.jpg');
         setError(null);
@@ -38,35 +37,31 @@ const HeroSection = () => {
       return;
     }
 
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files.length) return;
 
     const formData = new FormData();
-    formData.append('image', file);
+    Array.from(files).forEach((file) => formData.append('images', file)); // Updated to 'images'
 
     try {
-      const uploadResponse = await fetchWithToken(
-        '/api/assets/images',
-        {
-          method: 'POST',
-          body: formData,
-          headers: { 'Page': 'default' },
-        }
-      );
+      const uploadResponse = await fetchWithToken('/api/assets/images', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Page': 'default' },
+      });
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
-        throw new Error(`Failed to upload image: ${errorText}`);
+        throw new Error(`Failed to upload image(s): ${errorText}`);
       }
 
       const updatedResponse = await fetch('/api/assets/images?page=default');
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         console.log('Updated images after upload:', updatedData);
-        // Use S3 URLs directly without prepending baseUrl
         setImages(updatedData.images || []);
         setBackgroundImage(updatedData.images[0] || '/path-to-farm-image.jpg');
-        setSuccess('Background image updated successfully!');
+        setSuccess(`Uploaded ${files.length} image(s) successfully! Using first image as background.`);
       } else {
         throw new Error('Failed to update background image.');
       }
@@ -85,16 +80,13 @@ const HeroSection = () => {
     setDeletingImage(urlToRemove);
 
     try {
-      const response = await fetchWithToken(
-        '/api/assets/images',
-        {
-          method: 'DELETE',
-          headers: {
-            'Page': 'default',
-            'Url': urlToRemove, // Send the full S3 URL
-          },
-        }
-      );
+      const response = await fetchWithToken('/api/assets/images', {
+        method: 'DELETE',
+        headers: {
+          'Page': 'default',
+          'Url': urlToRemove,
+        },
+      });
 
       if (!response.ok && response.status !== 404) {
         const errorText = await response.text();
@@ -110,7 +102,6 @@ const HeroSection = () => {
 
       const updatedData = await updatedResponse.json();
       console.log('Updated images after delete:', updatedData);
-      // Use S3 URLs directly without prepending baseUrl
       setImages(updatedData.images || []);
       setBackgroundImage(updatedData.images[0] || '/path-to-farm-image.jpg');
       setSuccess('Image deleted successfully!');
@@ -140,6 +131,7 @@ const HeroSection = () => {
           <input
             type="file"
             accept="image/*"
+            multiple // Added 'multiple' to allow multiple file selection
             onChange={handleImageUpload}
             className="btn-primary p-2 rounded"
           />
