@@ -14,9 +14,7 @@ const jwt = require('jsonwebtoken');
 
 // Load environment variables from root .env
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('CALENDAR_ID:', process.env.CALENDAR_ID);
-console.log('GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY);
+
 
 const app = express();
 app.use(express.json());
@@ -37,7 +35,6 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.error('MongoDB connection error:', err));
 
 const authenticateToken = async (req, res, next) => {
-  console.log('Authenticating token for:', req.url, req.method);
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token && (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE')) {
     return res.status(401).json({ error: 'Authentication required for this action' });
@@ -47,10 +44,9 @@ const authenticateToken = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = { email: decoded.email };
       req.isAdmin = decoded.isAdmin;
-      console.log('Token verified for user:', req.user.email);
     } catch (err) {
       if (req.method !== 'GET') return res.status(401).json({ error: 'Invalid token: ' + err.message });
-      console.log('Token verification failed:', err.message);
+      
     }
   }
   next();
@@ -60,7 +56,6 @@ const authenticateToken = async (req, res, next) => {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, filePath) => {
     const ext = path.extname(filePath).toLowerCase();
-    console.log('Serving file:', filePath);
     if (ext === '.pdf') {
       res.set('Content-Type', 'application/pdf');
       const filename = path.basename(filePath);
@@ -73,13 +68,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  console.log('Health check endpoint hit');
   res.send('Server is healthy');
 });
 
 // Public GET endpoint
 app.get('/api/content', async (req, res) => {
-  console.log('Fetching content for all pages');
   try {
     const contents = await Content.find();
     res.json(contents);
@@ -97,7 +90,6 @@ app.use('/api/calendar', calendarRouter);
 
 // Token verification endpoint
 app.get('/api/verify-token', authenticateToken, (req, res) => {
-  console.log('Verifying token for:', req.user?.email);
   if (req.user && req.isAdmin !== undefined) {
     res.json({ email: req.user.email, isAdmin: req.isAdmin });
   } else {
@@ -107,12 +99,12 @@ app.get('/api/verify-token', authenticateToken, (req, res) => {
 
 // Serve React build
 const clientDistPath = path.join(__dirname, '../client/dist');
-console.log('Checking client dist path:', clientDistPath);
+
 if (fs.existsSync(clientDistPath)) {
-  console.log('Client dist directory found. Serving static files from:', clientDistPath);
+ 
   app.use(express.static(clientDistPath));
   app.get('*', (req, res) => {
-    console.log('Attempting to serve index.html for route:', req.url);
+    
     const indexPath = path.join(clientDistPath, 'index.html');
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath, (err) => {

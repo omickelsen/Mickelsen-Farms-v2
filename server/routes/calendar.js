@@ -10,7 +10,7 @@ const ADMIN_EMAILS = ['omickelsen@gmail.com', 'mickelsenfamilyfarms@gmail.com'];
 
 router.get('/events', async (req, res) => {
   try {
-    console.log('Fetching calendar events with calendarId:', process.env.CALENDAR_ID || 'mickelsenfamilyfarms@gmail.com');
+    
     const response = await calendarClient.events.list({
       calendarId: process.env.CALENDAR_ID || 'mickelsenfamilyfarms@gmail.com',
       timeMin: new Date().toISOString(),
@@ -19,7 +19,7 @@ router.get('/events', async (req, res) => {
       orderBy: 'startTime',
       timeZone: 'America/Los_Angeles',
     });
-    console.log('Calendar API response:', response.data);
+    
     const events = response.data.items.map(item => ({
       id: item.id,
       summary: item.summary || 'Untitled Event',
@@ -41,7 +41,7 @@ router.post('/events', async (req, res) => {
   if (!req.isAdmin) return res.status(403).send('Admin access required');
   try {
     const { summary, start, end, allDay = false, recurrence, recurrenceEnd } = req.body;
-    console.log('Received event data:', req.body);
+    
 
     if (!summary || !start || !end) {
       return res.status(400).send('Missing required fields: summary, start, or end');
@@ -54,11 +54,11 @@ router.post('/events', async (req, res) => {
       start: allDay ? { date: startMoment.utc().format('YYYY-MM-DD') } : { dateTime: startMoment.utc().toISOString(), timeZone: 'UTC' },
       end: allDay ? { date: endMoment.utc().format('YYYY-MM-DD') } : { dateTime: endMoment.utc().toISOString(), timeZone: 'UTC' },
     };
-    console.log('Creating event with normalized data:', event);
+    
 
     let response;
     if (recurrence && recurrence !== 'Does not repeat') {
-      console.log('Creating instances for recurrence:', recurrence);
+      
       const duration = moment.duration(endMoment.diff(startMoment));
       const instances = [];
       let current = startMoment.clone();
@@ -80,7 +80,7 @@ router.post('/events', async (req, res) => {
           timeZone: 'America/Los_Angeles',
         });
         instances.push(insertResponse.data);
-        console.log('Created instance:', insertResponse.data);
+       
         current.add(increment, 'days');
       }
       response = { data: instances[0] };
@@ -92,7 +92,7 @@ router.post('/events', async (req, res) => {
       });
     }
 
-    console.log('Created event (or instances):', response.data);
+    
     res.status(201).json(response.data);
   } catch (err) {
     console.error('Calendar API error (create):', err.stack, 'Details:', err.response ? JSON.stringify(err.response.data, null, 2) : 'No additional details');
@@ -104,7 +104,7 @@ router.put('/events/:eventId', async (req, res) => {
   if (!req.isAdmin) return res.status(403).send('Admin access required');
   try {
     const { summary, start, end, allDay = false, recurrence, recurrenceEnd } = req.body;
-    console.log('Updating event:', req.params.eventId, req.body);
+    
 
     if (!summary || !start || !end) {
       return res.status(400).send('Missing required fields: summary, start, or end');
@@ -117,11 +117,11 @@ router.put('/events/:eventId', async (req, res) => {
       start: allDay ? { date: startMoment.utc().format('YYYY-MM-DD') } : { dateTime: startMoment.utc().toISOString(), timeZone: 'UTC' },
       end: allDay ? { date: endMoment.utc().format('YYYY-MM-DD') } : { dateTime: endMoment.utc().toISOString(), timeZone: 'UTC' },
     };
-    console.log('Updating event with normalized data:', event);
+    
 
     let response;
     if (recurrence && recurrence !== 'Does not repeat') {
-      console.log('Updating with instances for recurrence:', recurrence);
+      
       const existingEvents = await calendarClient.events.list({
         calendarId: process.env.CALENDAR_ID || 'mickelsenfamilyfarms@gmail.com',
         q: summary,
@@ -158,7 +158,7 @@ router.put('/events/:eventId', async (req, res) => {
           timeZone: 'America/Los_Angeles',
         });
         instances.push(insertResponse.data);
-        console.log('Created instance:', insertResponse.data);
+        
         current.add(increment, 'days');
       }
       response = { data: instances[0] };
@@ -170,7 +170,7 @@ router.put('/events/:eventId', async (req, res) => {
       });
     }
 
-    console.log('Updated event (or instances):', response.data);
+    
     res.json(response.data);
   } catch (err) {
     console.error('Calendar API error (update):', err.stack, 'Details:', err.response ? JSON.stringify(err.response.data, null, 2) : 'No additional details');
@@ -181,7 +181,7 @@ router.put('/events/:eventId', async (req, res) => {
 router.delete('/events/:eventId', async (req, res) => {
   if (!req.isAdmin) return res.status(403).send('Admin access required');
   try {
-    console.log('Deleting event:', req.params.eventId);
+    
     const { deleteSeries } = req.body || {};
     const eventResponse = await calendarClient.events.get({
       calendarId: process.env.CALENDAR_ID || 'mickelsenfamilyfarms@gmail.com',
@@ -190,7 +190,7 @@ router.delete('/events/:eventId', async (req, res) => {
     const seriesId = eventResponse.data.extendedProperties?.private?.seriesId;
 
     if (deleteSeries && seriesId) {
-      console.log('Deleting series with seriesId:', seriesId);
+      
       const seriesEventsResponse = await calendarClient.events.list({
         calendarId: process.env.CALENDAR_ID || 'mickelsenfamilyfarms@gmail.com',
         q: eventResponse.data.summary,

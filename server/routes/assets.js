@@ -8,7 +8,7 @@ const AWS = require('aws-sdk');
 const jwt = require('jsonwebtoken');
 
 const authenticateToken = async (req, res, next) => {
-  console.log('Authenticating token for:', req.url, req.method);
+  
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token && (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE')) {
     return res.status(401).json({ error: 'Authentication required for this action' });
@@ -18,10 +18,10 @@ const authenticateToken = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = { email: decoded.email };
       req.isAdmin = decoded.isAdmin;
-      console.log('Token verified for user:', req.user.email);
+      
     } catch (err) {
       if (req.method !== 'GET') return res.status(401).json({ error: 'Invalid token: ' + err.message });
-      console.log('Token verification failed:', err.message);
+      
     }
   }
   next();
@@ -74,14 +74,12 @@ const initializeAssets = async () => {
       });
     }
   }
-  console.log('Initial assets data setup completed');
 };
 
 initializeAssets().catch(err => console.error('Initial setup error:', err));
 
 // Image-related routes
 router.get('/images', async (req, res) => {
-  console.log('Fetching images for page:', req.query.page);
   const page = req.query.page || 'default';
   try {
     const imageAsset = await ImageAssets.findOne({ page });
@@ -98,15 +96,12 @@ router.get('/images', async (req, res) => {
 
 router.post('/images', authenticateToken, upload.array('images'), async (req, res) => {
   if (!req.isAdmin) {
-    console.log('Unauthorized image upload attempt by:', req.user?.email);
     return res.status(403).json({ error: 'Admin access required' });
   }
   if (!req.files || req.files.length === 0) {
-    console.log('Invalid image upload attempt:', req.files);
     return res.status(400).json({ error: 'No valid images provided' });
   }
   const page = req.headers.page || 'default';
-  console.log('Uploading multiple images for page:', page, 'Number of files:', req.files.length);
 
   const uploadPromises = req.files.map(async (file) => {
     const url = `/uploads/${file.originalname}-${Date.now()}`;
@@ -117,9 +112,8 @@ router.post('/images', authenticateToken, upload.array('images'), async (req, re
       ContentType: file.mimetype,
     };
 
-    console.log('Initiating S3 upload with params:', params);
+    
     const s3Response = await s3.upload(params).promise();
-    console.log('S3 upload completed:', s3Response.Location);
     return s3Response.Location;
   });
 
@@ -132,10 +126,10 @@ router.post('/images', authenticateToken, upload.array('images'), async (req, re
         { $push: { urls: { $each: uploadedUrls } }, $set: { url: uploadedUrls[0] } },
         { new: true, runValidators: true }
       );
-      console.log('Updated ImageAssets with new images:', uploadedUrls);
+      
     } else {
       await ImageAssets.create({ url: uploadedUrls[0], urls: uploadedUrls, page });
-      console.log('Created new ImageAssets with images:', uploadedUrls);
+    
     }
     res.json({ urls: uploadedUrls });
   } catch (err) {
@@ -146,22 +140,22 @@ router.post('/images', authenticateToken, upload.array('images'), async (req, re
 
 router.delete('/images', authenticateToken, async (req, res) => {
   if (!req.isAdmin) {
-    console.log('Unauthorized image delete attempt by:', req.user?.email);
+    
     return res.status(403).json({ error: 'Admin access required' });
   }
   const page = req.headers.page || 'default';
   const urlToRemove = req.headers.url;
 
   if (!urlToRemove) {
-    console.log('Missing URL in image delete request');
+    
     return res.status(400).json({ error: 'URL to remove is required' });
   }
 
-  console.log('Deleting image for page:', page, 'URL:', urlToRemove);
+  
   try {
     const imageAsset = await ImageAssets.findOne({ page });
     if (!imageAsset) {
-      console.log('ImageAsset not found for page:', page);
+      
       return res.status(404).json({ error: 'ImageAsset not found' });
     }
 
@@ -172,7 +166,7 @@ router.delete('/images', authenticateToken, async (req, res) => {
     };
 
     await s3.deleteObject(params).promise();
-    console.log(`Deleted image from S3: ${key}`);
+    
 
     let updated = false;
     if (imageAsset.url === urlToRemove) {
@@ -182,7 +176,7 @@ router.delete('/images', authenticateToken, async (req, res) => {
         { new: true }
       );
       updated = true;
-      console.log('Removed image from url field:', urlToRemove);
+      
     } else if (imageAsset.urls && imageAsset.urls.includes(urlToRemove)) {
       await ImageAssets.findOneAndUpdate(
         { page },
@@ -190,11 +184,11 @@ router.delete('/images', authenticateToken, async (req, res) => {
         { new: true }
       );
       updated = true;
-      console.log('Removed image from urls array:', urlToRemove);
+      
     }
 
     if (!updated) {
-      console.log('Image not found in database:', urlToRemove);
+      
       return res.status(404).json({ error: 'Image not found' });
     }
 
@@ -205,14 +199,14 @@ router.delete('/images', authenticateToken, async (req, res) => {
         { $set: { url: updatedAsset.urls[0] } },
         { new: true }
       );
-      console.log('Updated url to:', updatedAsset.urls[0]);
+      
     } else {
       await ImageAssets.findOneAndUpdate(
         { page },
         { $unset: { url: 1 } },
         { new: true }
       );
-      console.log('Cleared url field as urls is empty');
+      
     }
 
     res.json({ message: 'Image removed successfully' });
@@ -224,14 +218,14 @@ router.delete('/images', authenticateToken, async (req, res) => {
 
 // PDF-related routes
 router.get('/pdfs', async (req, res) => {
-  console.log('Fetching PDFs for page:', req.query.page);
+ 
   const page = req.query.page || 'default';
   try {
     const pdfAsset = await PdfAssets.findOne({ page });
-    console.log('Found PdfAssets document:', pdfAsset);
+    
     const pdfs = pdfAsset ? pdfAsset.pdfs.map(p => ({ url: p.url, originalName: p.originalName || getCleanFilename(p.url), section: p.section })) : [];
     const cleanFilenames = pdfs.map(p => p.originalName);
-    console.log('Returning PDFs:', pdfs, 'Filenames:', cleanFilenames);
+    
     res.json({ pdfs, filenames: cleanFilenames });
   } catch (err) {
     console.error('Error fetching PDFs:', err.message);
@@ -239,76 +233,81 @@ router.get('/pdfs', async (req, res) => {
   }
 });
 
-router.post('/pdfs', authenticateToken, upload.single('pdf'), async (req, res) => {
+router.post('/pdfs', authenticateToken, upload.array('pdfs'), async (req, res) => {
   if (!req.isAdmin) {
-    console.log('Unauthorized PDF upload attempt by:', req.user?.email);
+    
     return res.status(403).json({ error: 'Admin access required' });
   }
-  if (!req.file || !req.file.buffer) {
-    console.log('Invalid PDF upload attempt: No file or buffer');
-    return res.status(400).json({ error: 'No file provided' });
-  }
-  console.log('Received file:', req.file.originalname, 'MIME type:', req.file.mimetype);
-
-  const isValidPdf = req.file.mimetype.startsWith('application/pdf') || req.file.originalname.toLowerCase().endsWith('.pdf');
-  if (!isValidPdf) {
-    console.log('Invalid PDF MIME type or extension:', req.file.mimetype, req.file.originalname);
-    return res.status(400).json({ error: 'No valid PDF provided' });
+  if (!req.files || req.files.length === 0) {
+    
+    return res.status(400).json({ error: 'No files provided' });
   }
 
-  const url = `/uploads/${req.file.originalname}-${Date.now()}`;
   const page = req.headers.page || 'default';
   const section = req.headers.section || 'default';
-  console.log('Uploading PDF for page:', page, 'URL:', url, 'Section:', section);
-
-  const params = {
-    Bucket: process.env.AWS_BUCKET_NAME,
-    Key: url.replace('/uploads/', ''),
-    Body: req.file.buffer,
-    ContentType: req.file.mimetype,
-  };
+  
 
   try {
-    console.log('Initiating S3 upload for PDF with params:', params);
-    const s3Response = await s3.upload(params).promise();
-    console.log('S3 PDF upload completed:', s3Response.Location);
-    const pdfAsset = await PdfAssets.findOne({ page });
-    if (pdfAsset) {
-      await PdfAssets.findOneAndUpdate(
-        { page },
-        { $push: { pdfs: { url: s3Response.Location, originalName: req.file.originalname, section } } },
-        { new: true, runValidators: true }
-      );
-      console.log('Updated PdfAssets with new PDF:', s3Response.Location);
-    } else {
-      await PdfAssets.create({ pdfs: [{ url: s3Response.Location, originalName: req.file.originalname, section }], page });
-      console.log('Created new PdfAssets with PDF:', s3Response.Location);
-    }
-    res.json({ url: s3Response.Location, section });
+    const uploadPromises = req.files.map(async (file) => {
+      const isValidPdf = file.mimetype.startsWith('application/pdf') || file.originalname.toLowerCase().endsWith('.pdf');
+      if (!isValidPdf) {
+       
+        throw new Error('No valid PDF provided');
+      }
+
+      const url = `/uploads/${file.originalname}-${Date.now()}`;
+      const params = {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: url.replace('/uploads/', ''),
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      };
+
+      
+      const s3Response = await s3.upload(params).promise();
+      
+
+      const pdfAsset = await PdfAssets.findOne({ page });
+      if (pdfAsset) {
+        await PdfAssets.findOneAndUpdate(
+          { page },
+          { $push: { pdfs: { url: s3Response.Location, originalName: file.originalname, section } } },
+          { new: true, runValidators: true }
+        );
+        
+      } else {
+        await PdfAssets.create({ pdfs: [{ url: s3Response.Location, originalName: file.originalname, section }], page });
+        
+      }
+      return s3Response.Location;
+    });
+
+    const uploadedUrls = await Promise.all(uploadPromises);
+    res.json({ urls: uploadedUrls });
   } catch (err) {
     console.error('Error during PDF upload:', err.message, err.stack);
-    res.status(500).json({ error: 'Failed to upload PDF: ' + err.message });
+    res.status(500).json({ error: 'Failed to upload PDFs: ' + err.message });
   }
 });
 
 router.delete('/pdfs', authenticateToken, async (req, res) => {
   if (!req.isAdmin) {
-    console.log('Unauthorized PDF delete attempt by:', req.user?.email);
+    
     return res.status(403).json({ error: 'Admin access required' });
   }
   const page = req.headers.page || 'default';
   const urlToRemove = req.headers.url;
 
   if (!urlToRemove) {
-    console.log('Missing URL in PDF delete request');
+    
     return res.status(400).json({ error: 'URL to remove is required' });
   }
 
-  console.log('Deleting PDF for page:', page, 'URL:', urlToRemove);
+ 
   try {
     const pdfAsset = await PdfAssets.findOne({ page });
     if (!pdfAsset) {
-      console.log('PdfAsset not found for page:', page);
+      
       return res.status(404).json({ error: 'PdfAsset not found' });
     }
 
@@ -319,7 +318,7 @@ router.delete('/pdfs', authenticateToken, async (req, res) => {
     };
 
     await s3.deleteObject(params).promise();
-    console.log(`Deleted PDF from S3: ${key}`);
+    
 
     if (pdfAsset.pdfs.some(p => p.url === urlToRemove)) {
       await PdfAssets.findOneAndUpdate(
@@ -327,9 +326,9 @@ router.delete('/pdfs', authenticateToken, async (req, res) => {
         { $pull: { pdfs: { url: urlToRemove } } },
         { new: true }
       );
-      console.log('Successfully removed PDF from pdfs array:', urlToRemove);
+      
     } else {
-      console.log('PDF not found in pdfs array:', urlToRemove);
+      
       return res.status(404).json({ error: 'PDF not found' });
     }
 

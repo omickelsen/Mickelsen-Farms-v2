@@ -6,20 +6,19 @@ const PdfUpload = ({ onUpload, page, section }) => {
   const { token, isAdmin } = useAuth();
 
   const onDrop = useCallback(
-    async (acceptedFiles) => { // Use acceptedFiles from useDropzone
-      if (!isAdmin || !token) {
-        // console.log('Upload prevented: Not an admin or no token');
-        return;
-      }
-
-      const file = acceptedFiles[0]; // Take the first file
-      if (!file || !file.type.startsWith('application/pdf')) {
-        // console.log('Invalid file uploaded:', file ? file.type : 'No file');
+    async (acceptedFiles) => {
+      if (!isAdmin) {
         return;
       }
 
       const formData = new FormData();
-      formData.append('pdf', file); // Matches server-side upload.single('pdf')
+      acceptedFiles.forEach((file) => {
+        if (file.type.startsWith('application/pdf') || file.name.toLowerCase().endsWith('.pdf')) {
+          formData.append('pdfs', file);
+        } else {
+          console.warn('Skipped file due to invalid type:', file.name);
+        }
+      });
 
       try {
         const response = await fetchWithToken('/api/assets/pdfs', {
@@ -27,25 +26,24 @@ const PdfUpload = ({ onUpload, page, section }) => {
           body: formData,
           headers: {
             'Page': page || 'default',
-            'Section': section || 'default', // Pass section in headers
+            'Section': section || 'default',
           },
         });
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Failed to upload PDF: ${errorText} (Status: ${response.status})`);
+          throw new Error(`Failed to upload PDFs: ${errorText} (Status: ${response.status})`);
         }
 
         const data = await response.json();
-        // console.log('PDF upload successful, response:', data);
-        if (onUpload && data.url) {
-          onUpload(data.url, data.section); // Pass the S3 URL and section to the parent
+        if (onUpload && data.urls) {
+          onUpload(data.urls);
         } else {
-          throw new Error('No URL returned from server');
+          throw new Error('No URLs returned from server');
         }
       } catch (err) {
         console.error('PDF upload error:', err.message);
-        alert(`PDF upload failed: ${err.message}`); // Notify user of failure
+        alert(`PDF upload failed: ${err.message}`);
       }
     },
     [token, isAdmin, onUpload, page, section]
@@ -53,8 +51,7 @@ const PdfUpload = ({ onUpload, page, section }) => {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: 'application/pdf', // Restrict to PDF files
-    multiple: false, // Single file upload for simplicity
+    multiple: true,
   });
 
   return isAdmin ? (
@@ -66,7 +63,7 @@ const PdfUpload = ({ onUpload, page, section }) => {
     >
       <input {...getInputProps()} />
       <p className="text-gray-600">
-        {isDragActive ? 'Drop the PDF here...' : 'Drag and drop a PDF here, or click to select a file'}
+        {isDragActive ? 'Drop the PDFs here...' : 'Drag and drop PDFs here, or click to select files'}
       </p>
     </div>
   ) : null;

@@ -27,7 +27,6 @@ function Events() {
         throw new Error(`Failed to fetch PDFs: ${pdfResponse.status} ${await pdfResponse.text()}`);
       }
       const pdfData = await pdfResponse.json();
-      console.log('Events - Raw PDF data:', pdfData);
       setPdfs(pdfData.pdfs || []);
       setError(null);
     } catch (err) {

@@ -21,7 +21,6 @@ router.get('/google', (req, res) => {
     scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar'],
     redirect_uri: redirectUri,
   });
-  console.log('Redirecting to Google with URL:', redirectUrl);
   res.redirect(redirectUrl);
 });
 
@@ -49,7 +48,6 @@ router.get('/google/callback', async (req, res) => {
       throw new Error('JWT_SECRET is not set in environment variables');
     }
     const token = jwt.sign({ email: userEmail, isAdmin }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    console.log('Generated JWT:', token);
 
     const host = req.headers.host;
     

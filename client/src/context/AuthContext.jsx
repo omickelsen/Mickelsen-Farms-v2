@@ -25,9 +25,8 @@ export const AuthProvider = ({ children }) => {
             const data = await response.json();
             setIsAdmin(data.isAdmin);
             setUser({ email: data.email });
-            setToken(jwtToken); // This will sync with localStorage via the next effect
-
           } else {
+            console.error('Token verification failed with status:', response.status);
             throw new Error('Token verification failed');
           }
         } catch (err) {
@@ -43,17 +42,15 @@ export const AuthProvider = ({ children }) => {
     };
 
     initializeAuth();
-  }, []); // Empty dependency array ensures this runs once on mount
+  }, [token]); // Ensure this runs whenever the token changes
 
-  // Sync token with localStorage without triggering re-renders unnecessarily
   useEffect(() => {
     if (token) {
       localStorage.setItem('jwtToken', token);
     } else {
       localStorage.removeItem('jwtToken');
     }
-    
-  }, [token]); // Only runs when token changes
+  }, [token]);
 
   const logout = () => {
     localStorage.removeItem('jwtToken');
