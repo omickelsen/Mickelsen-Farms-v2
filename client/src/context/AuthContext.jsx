@@ -13,32 +13,53 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       const jwtToken = localStorage.getItem('jwtToken');
       
-      if (jwtToken) {
-        try {
-          const response = await fetchWithToken('/api/verify-token', {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${jwtToken}`,
-            },
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setIsAdmin(data.isAdmin);
-            setUser({ email: data.email });
-          } else {
-            console.error('Token verification failed with status:', response.status);
-            throw new Error('Token verification failed');
-          }
-        } catch (err) {
-          console.error('Auth error:', err.message);
-          setError(err.message);
+      if (!jwtToken) {
+        console.log('No token found in localStorage - skipping verification');
+        setLoading(false);
+        return; // Exit early if no token
+      }
+      
+      try {
+        console.log('Attempting to verify token...');
+        // Use direct fetch instead of fetchWithToken to avoid circular dependency
+        const baseUrl = process.env.NODE_ENV === 'production' 
+          ? 'https://mickelsen-family-farms.herokuapp.com' 
+          : 'http://localhost:5000';
+        
+        const response = await fetch(`${baseUrl}/api/verify-token`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${jwtToken}`,
+            'Content-Type': 'application/json'
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Token verified successfully:', data);
+          setIsAdmin(data.isAdmin);
+          setUser({ email: data.email });
+        } else {
+          const errorText = await response.text();
+          console.error(`Token verification failed with status: ${response.status}`, errorText);
+          // Clear invalid token
           localStorage.removeItem('jwtToken');
           setToken(null);
           setUser(null);
           setIsAdmin(false);
+          throw new Error(`Token verification failed: ${errorText}`);
         }
+      } catch (err) {
+        console.error('Auth error:', err.message);
+        setError(err.message);
+        // Make sure token is cleared in catch block too
+        localStorage.removeItem('jwtToken');
+        setToken(null);
+        setUser(null);
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initializeAuth();
@@ -95,7 +116,9 @@ export const fetchWithToken = async (url, options = {}) => {
 
   const headers = {
     ...options.headers,
+    'Content-Type': options.headers?.['Content-Type'] || 'application/json',
   };
+  
   if (jwtToken) {
     headers['Authorization'] = `Bearer ${jwtToken}`;
   }
@@ -106,15 +129,20 @@ export const fetchWithToken = async (url, options = {}) => {
 
   const finalUrl = url.startsWith('http') ? url : `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}${url.replace(/^\//, '')}`;
   
+  console.log(`Fetching ${options.method || 'GET'} ${finalUrl} with auth token: ${jwtToken ? 'present' : 'none'}`);
 
   try {
     const response = await fetch(finalUrl, {
       ...options,
       headers,
     });
+    
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorBody = await response.text();
+      console.error(`Fetch error: ${response.status} ${response.statusText}`, errorBody);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorBody}`);
     }
+    
     return response;
   } catch (err) {
     console.error('Fetch error:', err.message);

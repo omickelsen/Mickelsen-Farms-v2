@@ -4,6 +4,7 @@ import PdfUpload from '../components/PdfUpload';
 import PdfDownload from '../components/PdfDownload';
 import { useAuth, fetchWithToken } from '../context/AuthContext';
 import Header from '../components/Header';
+import InstructorAvailability from '../components/InstructorAvailability';
 
 function HorseLessons() {
   const { isAdmin, token } = useAuth();
@@ -169,6 +170,12 @@ function HorseLessons() {
             <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
               <h3 className="text-2xl font-semibold text-teal-600 mb-4">Payment Info</h3>
               <EditableSection page="horse-lessons" initialContent="Payment via cash, check, or Venmo @MickelsenFarms." field="payment" />
+            </div>
+
+            {/* Instructor Availability Section */}
+            <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
+              <h3 className="text-2xl font-semibold text-teal-600 mb-4">Instructor Availability</h3>
+              <InstructorAvailability page="horse-lessons" />
             </div>
 
             {/* Registration Section */}

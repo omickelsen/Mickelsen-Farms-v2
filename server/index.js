@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const authRouter = require('./routes/auth');
 const calendarRouter = require('./routes/calendar');
 const contentRouter = require('./routes/content');
+const instructorsRouter = require('./routes/instructors');
 const assetsRouter = require('./routes/assets');
 const { calendarClient } = require('./config/googleCalendar');
 const path = require('path');
@@ -36,19 +37,41 @@ mongoose.connect(process.env.MONGODB_URI)
 
 const authenticateToken = async (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token && (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE')) {
+  
+  console.log(`Processing ${req.method} request for path: ${req.originalUrl}, base path: ${req.path}`);
+  
+  // Allow GET requests without authentication for most endpoints, including instructors
+  if (req.method === 'GET') {
+    // For instructor endpoints, attach isAdmin=false for non-authenticated users
+    if (req.path.includes('/instructors') && !token) {
+      req.isAdmin = false;
+    }
+    return next();
+  }
+  
+  // Require auth for all non-GET methods (POST, PUT, DELETE)
+  if (!token) {
+    console.log(`Authentication required for ${req.method} ${req.path}`);
     return res.status(401).json({ error: 'Authentication required for this action' });
   }
+  
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = { email: decoded.email };
       req.isAdmin = decoded.isAdmin;
-    } catch (err) {
-      if (req.method !== 'GET') return res.status(401).json({ error: 'Invalid token: ' + err.message });
       
+      // All instructor modification endpoints require admin privileges
+      if ((req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') && 
+          req.path.includes('/instructors') && !req.isAdmin) {
+        return res.status(403).json({ error: 'Admin privileges required for instructor management' });
+      }
+    } catch (err) {
+      console.error(`Token verification failed: ${err.message}`);
+      return res.status(401).json({ error: 'Invalid token: ' + err.message });
     }
   }
+  
   next();
 };
 
@@ -83,17 +106,46 @@ app.get('/api/content', async (req, res) => {
 });
 
 // Mount routers
-app.use('/api/content', contentRouter);
+app.use('/api/content', authenticateToken, contentRouter);
+app.use('/api/instructors', authenticateToken, instructorsRouter);
 app.use('/api/assets', assetsRouter);
 app.use('/auth', authRouter);
 app.use('/api/calendar', calendarRouter);
 
 // Token verification endpoint
-app.get('/api/verify-token', authenticateToken, (req, res) => {
-  if (req.user && req.isAdmin !== undefined) {
-    res.json({ email: req.user.email, isAdmin: req.isAdmin });
-  } else {
-    res.status(401).json({ error: 'Invalid or missing user data' });
+app.get('/api/verify-token', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  console.log('Token verification endpoint accessed');
+  
+  if (!token) {
+    console.log('No token provided to verify-token endpoint');
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  
+  try {
+    // Check if token exists and is valid format first
+    if (!token || token === 'null' || token === 'undefined') {
+      console.log('Invalid token format provided');
+      return res.status(401).json({ error: 'Invalid token format' });
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Check if decoded token contains the necessary fields
+    if (!decoded || !decoded.email) {
+      console.log('Token missing required fields');
+      return res.status(401).json({ error: 'Token missing required fields' });
+    }
+    
+    const user = { email: decoded.email };
+    const isAdmin = !!decoded.isAdmin; // Ensure boolean
+    
+    console.log(`Successfully verified token for ${user.email}, isAdmin: ${isAdmin}`);
+    res.json({ email: user.email, isAdmin: isAdmin });
+  } catch (err) {
+    console.error(`Token verification failed in endpoint: ${err.message}`);
+    res.status(401).json({ error: `Token verification failed: ${err.message}` });
   }
 });
 
