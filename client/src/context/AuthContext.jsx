@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     initializeAuth();
-  }, [token]); // Ensure this runs whenever the token changes
+  }, []); // Ensure this runs only once on mount
 
   useEffect(() => {
     if (token) {
@@ -116,7 +116,11 @@ export const fetchWithToken = async (url, options = {}) => {
 
   const headers = {
     ...options.headers,
-    'Content-Type': options.headers?.['Content-Type'] || 'application/json',
+    // Conditionally set Content-Type unless body is FormData
+    // Let the browser set the correct Content-Type for FormData
+    ...(!(options.body instanceof FormData) && { 
+      'Content-Type': options.headers?.['Content-Type'] || 'application/json' 
+    })
   };
   
   if (jwtToken) {

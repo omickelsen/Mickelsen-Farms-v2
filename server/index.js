@@ -18,7 +18,15 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 
 const app = express();
-app.use(express.json());
+// Only parse JSON for application/json requests
+app.use(express.json({ 
+  limit: '50mb', 
+  type: 'application/json' 
+})); 
+app.use(express.urlencoded({ 
+  limit: '50mb', 
+  extended: true 
+}));
 
 // Enhanced CORS configuration
 app.use(cors({
