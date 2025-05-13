@@ -21,7 +21,7 @@ const InstructorAvailability = ({ page }) => {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched instructors:', data);
+        // console.log('Fetched instructors:', data);
         
         // Sort instructors by availability (available first)
         const sortedInstructors = [...(data.instructors || [])].sort((a, b) => {
